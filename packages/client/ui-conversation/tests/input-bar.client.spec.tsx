@@ -62,7 +62,7 @@ interface BenchOptions {
     maxImagesPerMessage: number
     maxMessageImageBytes: number
     maxImagePixels: number
-    mediaTypes: readonly ('image/png' | 'image/jpeg' | 'image/webp' | 'image/gif')[]
+    mediaTypes: readonly ('image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | 'image/avif' | 'image/heif')[]
   }
   draft?: string
   running?: boolean
@@ -298,7 +298,7 @@ describe('image draft rail', () => {
   })
 
   it('announces the format problem before any limit when the batch holds a non-image', () => {
-    const addImages = vi.fn(() => '仅支持 PNG、JPG、WebP、GIF 格式的图片')
+    const addImages = vi.fn(() => '仅支持 PNG、JPG、WebP、GIF、AVIF、HEIC/HEIF 格式的图片')
     const { view } = bench({
       addImages,
       imageLimits: {
@@ -316,7 +316,7 @@ describe('image draft rail', () => {
     ]
     fireEvent.drop(document.body, { dataTransfer: { types: ['Files'], files, dropEffect: 'none' } })
     expect(addImages).toHaveBeenCalledWith(files)
-    expect(view.getByRole('alert').textContent).toContain('仅支持 PNG、JPG、WebP、GIF 格式的图片')
+    expect(view.getByRole('alert').textContent).toContain('仅支持 PNG、JPG、WebP、GIF、AVIF、HEIC/HEIF 格式的图片')
   })
 
   it('shows the projected limits in the drop overlay desc line', () => {
@@ -389,7 +389,7 @@ describe('image draft rail', () => {
   it('announces an image-intake rejection as a fading toast, repeatable for the same reason', () => {
     vi.useFakeTimers()
     try {
-      const addImages = vi.fn(() => '仅支持 PNG、JPG、WebP、GIF 格式的图片')
+      const addImages = vi.fn(() => '仅支持 PNG、JPG、WebP、GIF、AVIF、HEIC/HEIF 格式的图片')
       const { view, textarea } = bench({ addImages })
       const paste = () => {
         fireEvent.paste(textarea, {
@@ -400,12 +400,12 @@ describe('image draft rail', () => {
         })
       }
       paste()
-      expect(view.getByRole('alert').textContent).toContain('仅支持 PNG、JPG、WebP、GIF 格式的图片')
+      expect(view.getByRole('alert').textContent).toContain('仅支持 PNG、JPG、WebP、GIF、AVIF、HEIC/HEIF 格式的图片')
       act(() => { vi.advanceTimersByTime(4000) })
       expect(view.queryByRole('alert')).toBeNull()
       // The identical rejection re-announces: the toast is keyed per show.
       paste()
-      expect(view.getByRole('alert').textContent).toContain('仅支持 PNG、JPG、WebP、GIF 格式的图片')
+      expect(view.getByRole('alert').textContent).toContain('仅支持 PNG、JPG、WebP、GIF、AVIF、HEIC/HEIF 格式的图片')
     } finally {
       vi.useRealTimers()
     }

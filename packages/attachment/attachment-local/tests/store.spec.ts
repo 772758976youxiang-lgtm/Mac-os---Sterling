@@ -43,7 +43,7 @@ const LIMITS: ImageAttachmentLimits = {
   maxImagesPerMessage: 2,
   maxMessageImageBytes: 2048,
   maxImagePixels: 16,
-  mediaTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+  mediaTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'image/heif'],
 }
 
 const roots: string[] = []
@@ -70,6 +70,18 @@ afterEach(async () => {
 })
 
 describe('local attachment store', () => {
+  it('stores AVIF uploads as JPEG references for downstream image APIs', async () => {
+    const storageRoot = await root()
+    const avif = new Uint8Array(await sharp({
+      create: { width: 3, height: 2, channels: 4, background: { r: 1, g: 2, b: 3, alpha: 0.5 } },
+    }).avif().toBuffer())
+
+    const ref = await saveImageFile(storageRoot, { data: avif, mediaType: 'image/avif' }, LIMITS)
+
+    expect(ref).toMatchObject({ mediaType: 'image/jpeg', width: 3, height: 2 })
+    await expect(readImageFile(storageRoot, ref)).resolves.toMatchObject({ ref })
+  })
+
   it.skipIf(process.platform === 'win32')('syncs every object ancestor up to the durable boundary before returning', async () => {
     const storageRoot = await root()
     const base = join(storageRoot, '..', '..')

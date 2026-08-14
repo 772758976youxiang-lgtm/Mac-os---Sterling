@@ -787,6 +787,7 @@ function assistantSourceBlock(block: AssistantBlock): TrajectorySourceBlock {
     }
     // Attachment refs carry no fetchable bytes, so the record shows the
     // durable metadata instead of an inline preview.
+    case 'image-pending': return { type: 'image-pending', content: '' }
     case 'image': return {
       type: 'image',
       content: stringifySourceValue(block.attachment),

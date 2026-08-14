@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock } from '@deepseek-ai/dsh-api-remotes/client'
 import { toAssistantBlock, toAssistantBlocks } from '../src/client/sessions/conversation.ts'
+import { emptyAssistantBlock } from '../src/client/sessions/partial.ts'
 
 describe('toAssistantBlock', () => {
   it('classifies the four block shapes', () => {
@@ -27,5 +28,11 @@ describe('toAssistantBlock', () => {
       { kind: 'image', attachment },
     ])
     expect(toAssistantBlock(blocks[0] as ContentBlock)).toEqual({ kind: 'text', text: '正文' })
+  })
+})
+
+describe('emptyAssistantBlock', () => {
+  it('keeps an in-flight image distinct from an unknown block', () => {
+    expect(emptyAssistantBlock('image')).toEqual({ kind: 'image-pending' })
   })
 })

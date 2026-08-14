@@ -1,8 +1,8 @@
 import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
-import { detectImage, probeImage } from '../src/image.ts'
+import { detectImage, normalizeImage, probeImage } from '../src/image.ts'
 
-async function raster(format: 'png' | 'jpeg' | 'webp' | 'gif'): Promise<Uint8Array> {
+async function raster(format: 'png' | 'jpeg' | 'webp' | 'gif' | 'avif'): Promise<Uint8Array> {
   const image = sharp({
     create: { width: 3, height: 2, channels: 4, background: { r: 1, g: 2, b: 3, alpha: 1 } },
   })
@@ -16,10 +16,19 @@ describe('raster decoding', () => {
       ['jpeg', 'image/jpeg'],
       ['webp', 'image/webp'],
       ['gif', 'image/gif'],
+      // libvips reports the AVIF container as HEIF; admission accepts either
+      // browser MIME spelling and normalizes it before persistence.
+      ['avif', 'image/heif'],
     ] as const) {
       await expect(detectImage(await raster(format)))
         .resolves.toEqual({ mediaType, width: 3, height: 2 })
     }
+  })
+
+  it('normalizes AVIF to a portable JPEG reference', async () => {
+    const normalized = await normalizeImage(await raster('avif'), 'image/avif')
+    expect(normalized.detected).toEqual({ mediaType: 'image/heif', width: 3, height: 2 })
+    expect(normalized.stored).toEqual({ mediaType: 'image/jpeg', width: 3, height: 2 })
   })
 
   it('rejects excess decoded pixels before decoding', async () => {

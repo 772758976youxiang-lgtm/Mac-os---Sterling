@@ -23,6 +23,7 @@ import type {
   Provider,
   ThinkingLevelMap,
 } from '@earendil-works/pi-ai'
+import { OPENAI_IMAGE_GENERATIONS_API } from './image-generation.ts'
 
 /**
  * Pricing for a model the installed catalog does not describe. The harness
@@ -530,7 +531,11 @@ export function resolveRouteModels(request: RouteCatalogRequest): RouteCatalog {
       api,
       provider,
       baseUrl,
-      input: declaredInput(entry.input) ?? base?.input ?? [...request.defaultInput],
+      // Image routes are image-edit capable by protocol. A hand-declared
+      // route otherwise inherits the generic text-only fallback and the host
+      // would switch an attached-image turn to its separate vision fallback.
+      input: declaredInput(entry.input) ?? base?.input
+        ?? (api === OPENAI_IMAGE_GENERATIONS_API ? ['text', 'image'] : [...request.defaultInput]),
       cost: base?.cost ?? NO_COST,
       contextWindow,
       maxTokens,

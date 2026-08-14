@@ -47,10 +47,11 @@ import type {
   ResolvedRetryPolicy,
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
-import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { idleWatchdog, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
+import { generateOpenAIImages, OPENAI_IMAGE_GENERATIONS_API } from './image-generation.ts'
 import { toStreamChunks } from './stream.ts'
 
 /** One resolution's frozen view: the profiles and the collection built from them. */
@@ -157,11 +158,20 @@ function reasoningInfo(
 ): Pick<LlmResolvedModelInfo, 'reasoning'> | Record<string, never> {
   if (!model.reasoning) return {}
   const levels = getSupportedThinkingLevels(model)
+  const names: Record<ModelThinkingLevel, string> = {
+    off: 'Off',
+    minimal: 'Minimal',
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    xhigh: 'Extra High',
+    max: 'Ultra',
+  }
   return {
     reasoning: {
       efforts: levels.map(level => ({
         id: ReasoningEffortId(level),
-        name: `${level.charAt(0).toUpperCase()}${level.slice(1)}`,
+        name: names[level],
       })),
       ...defaultLevel === undefined ? {} : { defaultEffort: ReasoningEffortId(defaultLevel) },
     },
@@ -176,6 +186,32 @@ function requestHeaders(headers: Readonly<Record<string, string>> | undefined): 
     ...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase()))),
     ...attribution,
   }
+}
+
+/** Read the newest user prompt and its image references for an Image API request. */
+function imageRequest(options: GenerateOptions): { prompt: string; references: readonly ImageAttachmentRef[] } {
+  for (let index = options.messages.length - 1; index >= 0; index -= 1) {
+    const message = options.messages[index]
+    // Runtime context uses the user role so chat providers can receive it in
+    // order. The Image API accepts one prompt, however, and must use the
+    // submitted message rather than an injected context contribution.
+    if (message?.role !== 'user' || message.source.kind !== 'user') continue
+    const prompt = message.content
+      .filter(block => block.type === 'text')
+      .map(block => block.text)
+      .join('')
+      .trim()
+    if (prompt.length > 0) {
+      return {
+        prompt,
+        references: message.content
+          .filter((block): block is Extract<typeof block, { type: 'image' }> => block.type === 'image')
+          .map(block => block.attachment),
+      }
+    }
+    break
+  }
+  throw new LlmError('openai-image-generations requires text in the latest user message', 'UNSUPPORTED_CONTENT')
 }
 
 /**
@@ -290,6 +326,44 @@ export class PiAiAdapter extends LlmAdapter {
       options.reasoningEffort ?? profile.reasoning,
     )
     const apiKey = await this.config.resolveApiKey(options.provider, profile)
+
+    if (profile.api === OPENAI_IMAGE_GENERATIONS_API) {
+      const attachments = this.config.resolveAttachments?.()
+      if (attachments === undefined) {
+        throw new LlmError('openai-image-generations requires the durable attachment service', 'UNSUPPORTED_CONTENT')
+      }
+      const request = imageRequest(options)
+      const inputImages = await Promise.all(request.references.map(reference => attachments.readImage(reference, options.signal)))
+      const baseURL = profile.baseURL ?? model.baseUrl
+      const imageGeneration = profile.imageGeneration
+      if (baseURL === undefined || imageGeneration === undefined) {
+        throw new LlmError('openai-image-generations requires a resolved base URL and imageGeneration config', 'INVALID_DISCOVERY')
+      }
+      // Image APIs return only after the full render is ready. Start the first
+      // block before that request so clients can show generation progress.
+      yield { type: 'block-start', index: 0, blockType: 'image' }
+      const generated = await generateOpenAIImages({
+        baseURL,
+        model: model.id,
+        prompt: request.prompt,
+        ...apiKey === undefined ? {} : { apiKey },
+        headers: requestHeaders(profile.headers),
+        config: imageGeneration,
+        ...inputImages.length === 0 ? {} : {
+          images: inputImages.map(image => ({ data: image.data, mediaType: image.ref.mediaType })),
+        },
+        ...options.signal === undefined ? {} : { signal: options.signal },
+        maxImageBytes: attachments.imageLimits.maxImageBytes,
+      })
+      await Promise.all(generated.map(image => attachments.validateImage(image)))
+      const saved = await Promise.all(generated.map(image => attachments.saveImage(image)))
+      for (const [index, attachment] of saved.entries()) {
+        if (index > 0) yield { type: 'block-start', index, blockType: 'image' }
+        yield { type: 'block-end', index, block: { type: 'image', attachment } }
+      }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+      return
+    }
 
     const consumer = new AbortController()
     const upstream = options.signal === undefined

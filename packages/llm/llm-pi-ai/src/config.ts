@@ -30,6 +30,11 @@ import type {
   PiAiReasoningEfforts,
 } from './catalog.ts'
 import { buildProvider, supportedProtocols } from './provider.ts'
+import {
+  DEFAULT_OPENAI_IMAGE_GENERATION,
+  OPENAI_IMAGE_GENERATIONS_API,
+} from './image-generation.ts'
+import type { OpenAIImageGenerationConfig, ResolvedOpenAIImageGenerationConfig } from './image-generation.ts'
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
@@ -73,6 +78,8 @@ export interface PiAiProviderProfile {
    * no protocol at all; a route the catalog does not ship must name one.
    */
   api?: string
+  /** Controls accepted only for an `openai-image-generations` route. */
+  imageGeneration?: OpenAIImageGenerationConfig
   /** Endpoint for this route's models; defaults to the installed catalog's endpoint. */
   baseURL?: string
   /**
@@ -153,6 +160,8 @@ export interface ResolvedPiAiProviderProfile
   streamIdleTimeoutMs: number
   /** Immutable retry policy captured with this provider route. */
   retryPolicy: ResolvedRetryPolicy
+  /** Fully resolved controls for the OpenAI image-generation protocol, when this route uses it. */
+  imageGeneration?: ResolvedOpenAIImageGenerationConfig
   /**
    * The pi-ai provider this route registers, built from the resolved models.
    * Construction happens here so an unserviceable protocol or an underspecified
@@ -188,6 +197,13 @@ const thinkingBudgets = z.object({
 const compatProfile: z<PiAiCompatProfile> = z.object({
   thinkingFormat: z.union(SUPPORTED_THINKING_FORMATS),
   supportsReasoningEffort: z.boolean(),
+})
+
+const imageGeneration: z<OpenAIImageGenerationConfig> = z.object({
+  size: z.union(['1024x1024', '1536x1024', '1024x1536', 'auto']),
+  quality: z.union(['low', 'medium', 'high', 'auto']),
+  n: z.number().step(1).min(1),
+  responseFormat: z.union(['b64_json', 'url']),
 })
 
 /**
@@ -233,6 +249,7 @@ const profile = z.object({
   apiKeyEnv: z.string().role('credential-ref'),
   displayName: z.string(),
   api: z.union(supportedProtocols()),
+  imageGeneration,
   baseURL: z.string(),
   models: z.array(modelProfile),
   modelOverrides: z.dict(modelOverride),
@@ -336,6 +353,18 @@ export function resolveProfiles(
     // always shown route keys, and a catalog route must not silently rename
     // itself on every configuration surface just because it gained a profile.
     const displayName = source.displayName ?? provider
+    if (source.imageGeneration !== undefined && Object.keys(source.imageGeneration).length > 0
+      && source.api !== OPENAI_IMAGE_GENERATIONS_API) {
+      throw new Error(`llm-pi-ai: provider "${provider}" sets imageGeneration, but its api is not "${OPENAI_IMAGE_GENERATIONS_API}"`)
+    }
+    const resolvedImageGeneration: ResolvedOpenAIImageGenerationConfig | undefined = source.api !== OPENAI_IMAGE_GENERATIONS_API
+      ? undefined
+      : {
+        size: source.imageGeneration?.size ?? DEFAULT_OPENAI_IMAGE_GENERATION.size,
+        quality: source.imageGeneration?.quality ?? DEFAULT_OPENAI_IMAGE_GENERATION.quality,
+        n: source.imageGeneration?.n ?? DEFAULT_OPENAI_IMAGE_GENERATION.n,
+        responseFormat: source.imageGeneration?.responseFormat ?? DEFAULT_OPENAI_IMAGE_GENERATION.responseFormat,
+      }
     const catalog = resolveRouteModels({
       provider,
       ...source.api === undefined ? {} : { api: source.api },
@@ -347,7 +376,9 @@ export function resolveProfiles(
       defaultContextWindow: source.defaultContextWindow ?? DEFAULT_CONTEXT_WINDOW,
       defaultMaxTokens: source.defaultMaxTokens ?? DEFAULT_MAX_TOKENS,
     })
-    const { apiKeyEnv, retryPolicy, models: _models, displayName: _displayName, ...rest } = source
+    const {
+      apiKeyEnv, retryPolicy, models: _models, displayName: _displayName, imageGeneration: _imageGeneration, ...rest
+    } = source
     resolved.set(provider, {
       ...rest,
       provider,
@@ -355,6 +386,7 @@ export function resolveProfiles(
       ...apiKeyEnv === undefined ? {} : { apiKeyEnv: credentialRef(apiKeyEnv) },
       streamIdleTimeoutMs,
       retryPolicy: resolveRetryPolicy(retryPolicy, `llm-pi-ai: provider "${provider}" retryPolicy`),
+      ...resolvedImageGeneration === undefined ? {} : { imageGeneration: resolvedImageGeneration },
       ...rest.headers === undefined ? {} : { headers: { ...rest.headers } },
       ...rest.thinkingBudgets === undefined ? {} : { thinkingBudgets: { ...rest.thinkingBudgets } },
       configuredMaxTokens: catalog.configuredMaxTokens,

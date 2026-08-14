@@ -8,7 +8,7 @@ import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, St
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { readImageFile, saveImageFile, validateImageFile } from './store.ts'
 
-export { detectImage } from './image.ts'
+export { detectImage, normalizeImage } from './image.ts'
 export { readImageFile, saveImageFile, validateImageFile } from './store.ts'
 
 /** Default maximum encoded bytes for one image. */
@@ -56,7 +56,7 @@ export class LocalAttachmentStore extends AttachmentStore {
       maxImagesPerMessage: config.maxImagesPerMessage ?? DEFAULT_MAX_IMAGES_PER_MESSAGE,
       maxMessageImageBytes: config.maxMessageImageBytes ?? DEFAULT_MAX_MESSAGE_IMAGE_BYTES,
       maxImagePixels: config.maxImagePixels ?? DEFAULT_MAX_IMAGE_PIXELS,
-      mediaTypes: Object.freeze(['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const),
+      mediaTypes: Object.freeze(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'image/heif'] as const),
     })
   }
 

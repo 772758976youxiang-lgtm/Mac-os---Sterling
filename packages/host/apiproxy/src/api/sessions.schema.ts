@@ -276,6 +276,8 @@ export const imageMediaTypeSchema = z.union([
   z.literal('image/jpeg'),
   z.literal('image/webp'),
   z.literal('image/gif'),
+  z.literal('image/avif'),
+  z.literal('image/heif'),
 ])
 
 /** Prompt wire content is intentionally narrower than merge-extensible durable core content. */

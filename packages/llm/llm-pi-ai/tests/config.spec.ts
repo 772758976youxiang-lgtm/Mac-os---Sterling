@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertServiceable, Config } from '../src/config.ts'
+import { assertServiceable, Config, resolveProfiles } from '../src/config.ts'
 
 /** Validate one hand-declared route, with the caller's fields layered onto it. */
 const routeWith = (profile: Record<string, unknown>): (() => unknown) =>
@@ -62,5 +62,29 @@ describe('modality schema boundary', () => {
     const absent = configWith({})() as Materialized
     expect(absent.providers['acme-gateway']?.models?.[0]?.input).toEqual([])
     expect(absent.providers['acme-gateway']?.defaultInput).toEqual(['text'])
+  })
+})
+
+describe('OpenAI image-generation schema boundary', () => {
+  it('resolves the script-compatible image defaults on an image-generation route', () => {
+    const config = Config({
+      providers: {
+        images: {
+          api: 'openai-image-generations',
+          baseURL: 'https://images.example/v1',
+          models: [{ id: 'gpt-image-2' }],
+          imageGeneration: { n: 2 },
+        },
+      },
+    })
+    expect(assertServiceable(config)).toBeUndefined()
+    expect(resolveProfiles(config.providers).get('images')?.imageGeneration).toEqual({
+      size: '1024x1024', quality: 'high', n: 2, responseFormat: 'b64_json',
+    })
+  })
+
+  it('refuses image-generation controls on a chat protocol', () => {
+    const config = routeWith({ imageGeneration: { size: 'auto' } })() as Config
+    expect(() => { assertServiceable(config) }).toThrow(/sets imageGeneration/)
   })
 })

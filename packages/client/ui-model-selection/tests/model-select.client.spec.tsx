@@ -68,10 +68,10 @@ describe('ModelSelect reasoning effort', () => {
     })
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
-    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
-      .toEqual(['Off', 'High', 'MaxLargest budget'])
-
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Max/ }))
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    expect(slider.getAttribute('max')).toBe('2')
+    fireEvent.change(slider, { target: { value: '2' } })
+    fireEvent.pointerUp(slider)
     await waitFor(() => {
       expect(select).toHaveBeenCalledWith({
         provider: 'deepseek-official',
@@ -79,6 +79,44 @@ describe('ModelSelect reasoning effort', () => {
         reasoningEffort: 'max',
       })
       expect(trigger.getAttribute('aria-label')).toBe('选择模型，当前 DeepSeek-V4-Flash，推理等级 Max')
+    })
+  })
+
+  it('tracks pointer position continuously before committing the nearest effort on release', async () => {
+    const directory = createSnapshotStore<ModelDirectoryState>(state())
+    const select = vi.fn(async (selection: ModelSelection) => {
+      directory.set(state({ current: selection }))
+      return true
+    })
+    const { container } = render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={select}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: /当前 DeepSeek-V4-Flash/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    Object.defineProperty(slider, 'getBoundingClientRect', {
+      value: () => ({ left: 100, width: 200 }),
+    })
+    fireEvent.pointerDown(slider, { clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(slider, { clientX: 250, pointerId: 1 })
+
+    const fill = container.querySelector('[style*="width"]') as HTMLElement
+    expect(fill.style.width).toBe('75%')
+    expect(select).not.toHaveBeenCalled()
+
+    fireEvent.pointerUp(slider, { clientX: 300, pointerId: 1 })
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({
+        provider: 'deepseek-official',
+        model: 'deepseek-v4-flash',
+        reasoningEffort: 'max',
+      })
     })
   })
 

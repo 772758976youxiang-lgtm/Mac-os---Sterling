@@ -128,7 +128,55 @@ function registerTextOnly(ctx: Context): void {
   }('Text Only', []))
 }
 
+function registerImageCapable(ctx: Context): void {
+  ctx.llm.registerAdapter(['vision'], new class extends CatalogAdapter {
+    override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+      return Promise.resolve({ provider, id: model, name: model, inputModalities: ['text', 'image'] })
+    }
+  }('Vision', []))
+}
+
 describe('Web session model selection', () => {
+  it('routes an image turn through the configured vision model, then restores the text-only selection', async () => {
+    const { ctx, agent, sessionId } = await harness()
+    registerTextOnly(ctx)
+    registerImageCapable(ctx)
+    ctx.provide('attachments', {
+      imageLimits: {
+        maxImageBytes: 4,
+        maxImagesPerMessage: 2,
+        maxMessageImageBytes: 4,
+        maxImagePixels: 4,
+        mediaTypes: ['image/png'],
+      },
+      validateImage: () => Promise.resolve(),
+      saveImage: () => Promise.resolve({
+        attachmentId: 'att-vision', mediaType: 'image/png', bytes: 1, width: 1, height: 1,
+      }),
+    } as never)
+    const followup = vi.fn()
+    Object.assign(agent, { followup })
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'text-only', model: 'plain' }),
+      imageFallback: { provider: 'vision', model: 'vision-model' },
+      cwd: '/tmp',
+    })
+
+    expectValue(await api.sessions.prompt(request({
+      sessionId,
+      mode: 'queue' as const,
+      content: [{ type: 'image' as const, mediaType: 'image/png' as const, data: 'AQ==' }],
+    })))
+    expect(followup).toHaveBeenCalledOnce()
+    expect(expectValue(await api.sessions.models(request({ sessionId }))).current)
+      .toEqual({ provider: 'vision', model: 'vision-model' })
+
+    agentEvents(ctx, agent).emit('agent/status', { status: 'idle' })
+    expect(expectValue(await api.sessions.models(request({ sessionId }))).current)
+      .toEqual({ provider: 'text-only', model: 'plain' })
+    await ctx.fiber.dispose()
+  })
+
   it('validates an ordered image batch before persisting any member', async () => {
     const { ctx, agent, sessionId } = await harness()
     const validateImage = vi.fn((_input: { data: Uint8Array }) => Promise.resolve())
@@ -196,7 +244,7 @@ describe('Web session model selection', () => {
     await ctx.fiber.dispose()
   })
 
-  it('refuses a text-only selection while durable or pending image content remains visible', async () => {
+  it('allows switching to a text-only model when durable or pending image content remains visible', async () => {
     const { ctx, agent, sessionId } = await harness()
     registerTextOnly(ctx)
     const api = createApiProxy(ctx, {
@@ -210,24 +258,13 @@ describe('Web session model selection', () => {
     agent.session.append('user/message', {
       id: 'image-message', role: 'user', source: { kind: 'user' }, content: [image],
     } as never, { surfaceOp: 'append' })
-    expect((await api.sessions.selectModel(request({
+    expect(expectValue(await api.sessions.selectModel(request({
       sessionId, provider: 'text-only', model: 'plain',
-    }))).result).toMatchObject({ ok: false, error: { code: 'model-unavailable' } })
+    }))).selected).toEqual({ provider: 'text-only', model: 'plain' })
 
-    agent.session.append('user/message', {
-      id: 'summary', role: 'user', source: { kind: 'plugin', plugin: 'compact' },
-      content: [{ type: 'text', text: 'image summarized' }],
-    } as never, {
-      surfaceOp: { op: 'replace', start: 0, end: agent.session.events.length - 1 },
-      sourceEventSeqs: agent.session.events.map(event => event.seq),
-    })
     ;(agent.inbox.nextTurn as UserMessage[]).push({
       id: 'pending-image', role: 'user', source: { kind: 'user' }, content: [image],
     } as never)
-    expect((await api.sessions.selectModel(request({
-      sessionId, provider: 'text-only', model: 'plain',
-    }))).result.ok).toBe(false)
-    ;(agent.inbox.nextTurn as UserMessage[]).length = 0
     expect(expectValue(await api.sessions.selectModel(request({
       sessionId, provider: 'text-only', model: 'plain',
     }))).selected).toEqual({ provider: 'text-only', model: 'plain' })

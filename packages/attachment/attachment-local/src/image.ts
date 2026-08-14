@@ -16,6 +16,18 @@ const MEDIA_TYPES: Readonly<Record<string, ImageMediaType>> = {
   jpeg: 'image/jpeg',
   webp: 'image/webp',
   gif: 'image/gif',
+  avif: 'image/avif',
+  heif: 'image/heif',
+}
+
+/** Formats decoded locally but normalized before becoming durable references. */
+function requiresNormalization(mediaType: ImageMediaType): boolean {
+  return mediaType === 'image/avif' || mediaType === 'image/heif'
+}
+
+/** libvips reports both AVIF and HEIF containers as `heif`; both normalize. */
+function matchesDeclaredType(detected: ImageMediaType, declared: ImageMediaType): boolean {
+  return detected === declared || (detected === 'image/heif' && declared === 'image/avif')
 }
 
 async function imageMetadata(image: Sharp): Promise<DetectedImage> {
@@ -59,6 +71,39 @@ export async function detectImage(data: Uint8Array, maxPixels?: number): Promise
     }
     await image.raw().toBuffer()
     return detected
+  } catch (error) {
+    if (error instanceof AttachmentError) throw error
+    throw new AttachmentError('Unsupported or malformed image data.', 'INVALID_IMAGE', { cause: error })
+  }
+}
+
+/**
+ * Decode a browser-friendly raster and convert formats not accepted by image
+ * APIs to JPEG before they enter durable model context.
+ * @param data - complete encoded image bytes.
+ * @param declaredMediaType - browser-declared, canonicalized media type.
+ * @param maxPixels - decoded-pixel admission limit.
+ * @returns source metadata plus the canonical bytes and metadata to store.
+ */
+export async function normalizeImage(
+  data: Uint8Array,
+  declaredMediaType: ImageMediaType,
+  maxPixels?: number,
+): Promise<{ data: Uint8Array; detected: DetectedImage; stored: DetectedImage }> {
+  const detected = await detectImage(data, maxPixels)
+  if (!matchesDeclaredType(detected.mediaType, declaredMediaType)) {
+    throw new AttachmentError('Declared image type does not match its bytes.', 'IMAGE_TYPE_MISMATCH')
+  }
+  if (!requiresNormalization(detected.mediaType)) return { data, detected, stored: detected }
+  try {
+    // HEIC/HEIF and AVIF are common browser upload formats but are not a
+    // portable Image API edit input. Flatten preserves a deterministic result
+    // for AVIF alpha before encoding a universally accepted JPEG reference.
+    const normalized = new Uint8Array(await sharp(data, { failOn: 'error', limitInputPixels: false })
+      .flatten({ background: '#ffffff' })
+      .jpeg({ quality: 90, mozjpeg: true })
+      .toBuffer())
+    return { data: normalized, detected, stored: await detectImage(normalized, maxPixels) }
   } catch (error) {
     if (error instanceof AttachmentError) throw error
     throw new AttachmentError('Unsupported or malformed image data.', 'INVALID_IMAGE', { cause: error })

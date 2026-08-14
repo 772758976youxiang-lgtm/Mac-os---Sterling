@@ -137,6 +137,16 @@ describe('draft-provider model discovery', () => {
     expect(server.paths).toEqual(['/openai/v1/models'])
   })
 
+  it('reads an image-generation route through the shared model listing endpoint', async () => {
+    const server = await listingServer({ body: JSON.stringify({ data: [{ id: 'gpt-image-2' }] }) })
+    const ctx = await harness()
+
+    await expect(ctx.llm.discoverModels('llm-pi-ai', {
+      baseURL: server.url, api: 'openai-image-generations', apiKey: 'probe-key',
+    })).resolves.toEqual([{ id: 'gpt-image-2' }])
+    expect(server.paths).toEqual(['/models'])
+  })
+
   it('offers no credential when the draft names none', async () => {
     const server = await listingServer({ body: JSON.stringify({ data: [{ id: 'm' }] }) })
     const ctx = await harness()

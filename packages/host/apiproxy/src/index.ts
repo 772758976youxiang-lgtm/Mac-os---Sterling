@@ -59,6 +59,11 @@ export interface Config {
    * @default 1024
    */
   coldBlankProbeMaxBytes?: number
+  /** Image-capable model used for one automatic fallback turn from a text-only model. */
+  imageFallback?: {
+    provider: string
+    model: string
+  }
 }
 
 /**
@@ -77,6 +82,7 @@ export class ApiProxyService extends Service implements ApiProxy {
     sessionExportCompressionLevel: z.number().step(1).min(0).max(9)
       .default(DEFAULT_SESSION_LOG_COMPRESSION_LEVEL) as z<SessionLogCompressionLevel>,
     coldBlankProbeMaxBytes: z.natural().default(DEFAULT_COLD_BLANK_PROBE_MAX_BYTES),
+    imageFallback: z.object({ provider: z.string(), model: z.string() }),
   })
 
   readonly sessions: ApiProxy['sessions']
@@ -106,6 +112,7 @@ export class ApiProxyService extends Service implements ApiProxy {
       ...(config.coldBlankProbeMaxBytes === undefined
         ? {}
         : { coldBlankProbeMaxBytes: config.coldBlankProbeMaxBytes }),
+      ...(config.imageFallback === undefined ? {} : { imageFallback: config.imageFallback }),
     })
     this.sessions = api.sessions
     this.subagents = api.subagents

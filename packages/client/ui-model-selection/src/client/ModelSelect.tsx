@@ -3,7 +3,8 @@
  * Two-level selection per figma 496:26454's MenuDropdown: the root menu is
  * the Model / Effort row pair (label + current value + a right chevron),
  * each drilling into its own list — the provider-grouped model list over
- * the shared directory, and the effort levels. The trigger (313:14108's
+ * the shared directory, and the effort levels. A three-or-more-level effort
+ * range is a discrete slider; short/provider-default ranges stay a list. The trigger (313:14108's
  * ToggleButton) shows both: model name + effort in the caption tone.
  * Data and submission ride the SAME per-session ModelDirectory as the
  * /model popup; exact-model reasoning metadata and the selected effort come
@@ -52,11 +53,15 @@ export function ModelSelect(
   )
   const [open, setOpen] = useState(false)
   const [pane, setPane] = useState<Pane>('root')
+  const [draftEffort, setDraftEffort] = useState<string | undefined>(undefined)
+  const [liquidProgress, setLiquidProgress] = useState<number | undefined>(undefined)
   // The in-menu error strip serves catalog loads (its Retry re-runs the
   // load); a rejected SELECTION announces through the transient toast
   // instead, so the strip renders only while the latest failure-capable
   // action was a load.
   const lastActionRef = useRef<'load' | 'select'>('load')
+  const draftEffortRef = useRef<string | undefined>(undefined)
+  const draggingRef = useRef(false)
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
   const toastSeq = useRef(0)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -100,7 +105,20 @@ export function ModelSelect(
         ...effort.description === undefined ? {} : { description: effort.description },
       })),
     ], [reasoning, t])
+  const sliderChoices = effortChoices.filter((choice): choice is EffortChoice & { effort: string } => choice.effort !== undefined)
+  const showEffortSlider = effortChoices.length === sliderChoices.length && sliderChoices.length >= 3
+  const displayedEffort = draftEffort ?? effectiveEffort
+  const sliderIndex = Math.max(0, sliderChoices.findIndex(choice => choice.effort === displayedEffort))
+  const selectedProgress = sliderChoices.length <= 1 ? 0 : sliderIndex / (sliderChoices.length - 1)
+  const displayedProgress = liquidProgress ?? selectedProgress
+  const isMaximumEffort = displayedProgress >= .995
   const busy = state.status === 'selecting'
+
+  useEffect(() => {
+    setDraftEffort(undefined)
+    draftEffortRef.current = undefined
+    setLiquidProgress(undefined)
+  }, [effectiveEffort, state.current?.provider, state.current?.model])
 
   const reload = (): void => {
     lastActionRef.current = 'load'
@@ -147,6 +165,7 @@ export function ModelSelect(
   }
 
   const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.target instanceof HTMLInputElement && event.target.type === 'range') return
     if (event.key === 'Escape' && open) {
       event.preventDefault()
       // Escape backs out of a drilled pane first, then closes.
@@ -200,6 +219,25 @@ export function ModelSelect(
     }
     lastActionRef.current = 'select'
     void select(selection).then(settleSelection)
+  }
+
+  const commitDraftEffort = (): void => {
+    draggingRef.current = false
+    const effort = draftEffortRef.current
+    draftEffortRef.current = undefined
+    if (effort !== undefined && effort !== effectiveEffort) chooseEffort(effort)
+  }
+
+  const setProgressFromPointer = (clientX: number, target: HTMLInputElement): void => {
+    const bounds = target.getBoundingClientRect()
+    if (bounds.width <= 0 || sliderChoices.length === 0) return
+    const progress = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width))
+    const index = Math.round(progress * (sliderChoices.length - 1))
+    const effort = sliderChoices[index]?.effort
+    if (effort === undefined) return
+    draftEffortRef.current = effort
+    setDraftEffort(effort)
+    setLiquidProgress(progress)
   }
 
   const modelLabel = currentChoice?.model.name ?? t('trigger.fallback')
@@ -335,28 +373,103 @@ export function ModelSelect(
               )}
               {effortChoices.length === 0
                 ? <div className={css.empty}>{t('empty.efforts')}</div>
-                : effortChoices.map(level => (
-                  <button
-                    ref={itemRef()}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={effectiveEffort === level.effort}
-                    className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
-                    key={level.key}
-                    disabled={busy}
-                    onClick={() => { chooseEffort(level.effort) }}
-                  >
-                    <span className={css.optionCopy}>
-                      <span className={css.modelName}>{level.label}</span>
-                      {level.description !== undefined && (
-                        <span className={css.description}>{level.description}</span>
-                      )}
-                    </span>
-                    <span className={css.check}>
-                      {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
-                    </span>
-                  </button>
-                ))}
+                : showEffortSlider
+                  ? (
+                    <div className={css.effortSlider} role="group" aria-label={t('menu.effort')}>
+                      <div className={css.effortSliderValue}>{sliderChoices[sliderIndex]?.label}</div>
+                      <div className={clsx(css.liquidTrack, isMaximumEffort && css.liquidTrackMaximum)}>
+                        <div className={css.liquidFill} style={{ width: `${String(displayedProgress * 100)}%` }}>
+                          <span className={css.liquidWave} aria-hidden />
+                          <span className={clsx(css.liquidSpark, css.sparkOne)} aria-hidden>✦</span>
+                          <span className={clsx(css.liquidSpark, css.sparkTwo)} aria-hidden>✦</span>
+                          <span className={clsx(css.liquidSpark, css.sparkThree)} aria-hidden>✦</span>
+                          <span className={clsx(css.liquidSpark, css.sparkFour)} aria-hidden>✦</span>
+                          {isMaximumEffort && <>
+                            <span className={clsx(css.liquidSpark, css.liquidSparkMax, css.sparkFive)} aria-hidden>✦</span>
+                            <span className={clsx(css.liquidSpark, css.liquidSparkMax, css.sparkSix)} aria-hidden>✦</span>
+                            <span className={clsx(css.liquidSpark, css.liquidSparkMax, css.sparkSeven)} aria-hidden>✦</span>
+                            <span className={clsx(css.liquidSpark, css.liquidSparkMax, css.sparkEight)} aria-hidden>✦</span>
+                            <span className={clsx(css.liquidSpark, css.liquidSparkMax, css.sparkNine)} aria-hidden>✦</span>
+                            <span className={clsx(css.liquidSpark, css.liquidSparkMax, css.sparkTen)} aria-hidden>✦</span>
+                          </>}
+                        </div>
+                        <input
+                          key={`${state.current?.provider ?? ''}/${state.current?.model ?? ''}/${effectiveEffort ?? ''}`}
+                          className={css.effortRange}
+                          type="range"
+                          min={0}
+                          max={sliderChoices.length - 1}
+                          step={1}
+                          value={sliderIndex}
+                          aria-label={t('menu.effort')}
+                          aria-valuetext={sliderChoices[sliderIndex]?.label}
+                          disabled={busy}
+                          onChange={(event) => {
+                            const choice = sliderChoices[Number(event.currentTarget.value)]
+                            if (choice !== undefined) {
+                              draftEffortRef.current = choice.effort
+                              setDraftEffort(choice.effort)
+                              setLiquidProgress(Number(event.currentTarget.value) / (sliderChoices.length - 1))
+                            }
+                          }}
+                          onPointerDown={(event) => {
+                            draggingRef.current = true
+                            event.currentTarget.setPointerCapture?.(event.pointerId)
+                            setProgressFromPointer(event.clientX, event.currentTarget)
+                          }}
+                          onPointerMove={(event) => {
+                            if (draggingRef.current) setProgressFromPointer(event.clientX, event.currentTarget)
+                          }}
+                          onPointerUp={(event) => {
+                            setProgressFromPointer(event.clientX, event.currentTarget)
+                            if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+                              event.currentTarget.releasePointerCapture?.(event.pointerId)
+                            }
+                            commitDraftEffort()
+                          }}
+                          onPointerCancel={() => {
+                            draggingRef.current = false
+                            setLiquidProgress(undefined)
+                          }}
+                          onKeyUp={(event) => {
+                            if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
+                              commitDraftEffort()
+                            }
+                          }}
+                          onBlur={commitDraftEffort}
+                        />
+                      </div>
+                      <div className={css.effortTicks} style={{ gridTemplateColumns: `repeat(${String(sliderChoices.length)}, minmax(0, 1fr))` }} aria-hidden>
+                        {sliderChoices.map(choice => <span className={css.effortTick} key={choice.key} />)}
+                      </div>
+                      <div className={css.effortEndpoints}>
+                        <span>{sliderChoices[0]?.label}</span>
+                        <span>{sliderChoices.at(-1)?.label}</span>
+                      </div>
+                    </div>
+                  )
+                  : effortChoices.map(level => (
+                    <button
+                      ref={itemRef()}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={effectiveEffort === level.effort}
+                      className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
+                      key={level.key}
+                      disabled={busy}
+                      onClick={() => { chooseEffort(level.effort) }}
+                    >
+                      <span className={css.optionCopy}>
+                        <span className={css.modelName}>{level.label}</span>
+                        {level.description !== undefined && (
+                          <span className={css.description}>{level.description}</span>
+                        )}
+                      </span>
+                      <span className={css.check}>
+                        {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
+                      </span>
+                    </button>
+                  ))}
             </>
           )}
         </div>

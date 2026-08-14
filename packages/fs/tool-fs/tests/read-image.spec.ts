@@ -153,12 +153,14 @@ function text(result: { content: { type: string; text?: string }[] }): string {
 }
 
 describe('imageMediaTypeForPath', () => {
-  it('maps the four extensions case-insensitively and rejects everything else', () => {
+  it('maps supported extensions case-insensitively and rejects everything else', () => {
     expect(imageMediaTypeForPath('a.png')).toBe('image/png')
     expect(imageMediaTypeForPath('a.JPG')).toBe('image/jpeg')
     expect(imageMediaTypeForPath('b.jpeg')).toBe('image/jpeg')
     expect(imageMediaTypeForPath('c.webp')).toBe('image/webp')
     expect(imageMediaTypeForPath('d.Gif')).toBe('image/gif')
+    expect(imageMediaTypeForPath('e.avif')).toBe('image/avif')
+    expect(imageMediaTypeForPath('f.HEIC')).toBe('image/heif')
     expect(imageMediaTypeForPath('note.txt')).toBeUndefined()
     expect(imageMediaTypeForPath('png')).toBeUndefined()
   })
@@ -306,7 +308,7 @@ describe('argument and service preconditions', () => {
 
     const nonImage = await readImage(ctx, { file_path: 'notes.txt' }, agentOn('vision-model'))
     expect(nonImage.isError).toBe(true)
-    expect(text(nonImage)).toContain('only accepts PNG/JPEG/WebP/GIF paths')
+    expect(text(nonImage)).toContain('only accepts PNG/JPEG/WebP/GIF/AVIF/HEIF paths')
   })
 
   it('refuses when no attachment service is mounted', async () => {
@@ -366,7 +368,7 @@ describe('image admission failures', () => {
     const result = await readImage(ctx, { file_path: 'wrong.jpg' }, agentOn('vision-model'))
     expect(result.isError).toBe(true)
     expect(text(result)).toContain('the .jpg extension declares image/jpeg')
-    expect(text(result)).toContain('rename the file to match its actual format if it is PNG/JPEG/WebP/GIF, or convert it to one of those formats')
+    expect(text(result)).toContain('rename the file to match its actual format or convert it')
   })
 
   it('fails with FS_TOO_LARGE before reading a file past maxImageBytes', async () => {

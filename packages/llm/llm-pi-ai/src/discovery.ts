@@ -28,8 +28,8 @@ import { attributionHeaders } from '@deepseek-ai/dsh-llm'
 import { catalogModels } from './catalog.ts'
 
 /**
- * Protocols whose model listing this module can read: the two that speak
- * OpenAI's `GET /models` shape with bearer auth. Azure is absent despite its
+ * Protocols whose model listing this module can read: the OpenAI chat and
+ * image protocols that speak the `GET /models` shape with bearer auth. Azure is absent despite its
  * OpenAI lineage — it authenticates with an `api-key` header and requires an
  * `api-version` query — and Codex authenticates through OAuth; guessing at
  * either would report an authentication failure as a provider with no models.
@@ -38,6 +38,7 @@ import { catalogModels } from './catalog.ts'
 const LISTABLE_PROTOCOLS: ReadonlySet<string> = new Set([
   'openai-completions',
   'openai-responses',
+  'openai-image-generations',
 ])
 
 /**

@@ -65,6 +65,7 @@ function hasVisibleContent(blocks: readonly AssistantBlock[]): boolean {
 function hasInterruptionEvidence(blocks: readonly AssistantBlock[]): boolean {
   return blocks.some((block) => {
     if (block.kind === 'text' || block.kind === 'reasoning') return block.text.trim() !== ''
+    if (block.kind === 'image-pending') return false
     return true
   })
 }

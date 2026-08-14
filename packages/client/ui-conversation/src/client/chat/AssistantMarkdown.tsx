@@ -47,7 +47,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   // between tool groups — skip the shell unless something visible remains.
   const hasVisible = streaming
     || interrupted === true
-    || blocks.some(block => block.kind !== 'tool-call')
+    || blocks.some(block => block.kind !== 'tool-call' && block.kind !== 'image-pending')
   if (!hasVisible) return null
   const rendered: ReactNode[] = []
   for (let i = 0; i < blocks.length; i++) {
@@ -67,6 +67,16 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         break
       case 'reasoning':
         rendered.push(<ReasoningRow key={i} text={block.text} running={streaming && i === last} t={t} />)
+        break
+      case 'image-pending':
+        if (streaming) {
+          rendered.push(
+            <div key={i} className={css.imageGenerationPending} data-image-generation-pending role="status" aria-live="polite">
+              <span className={css.imageGenerationLabel}>{t('image.generating')}</span>
+              <div className={css.imageGenerationCanvas} aria-hidden />
+            </div>,
+          )
+        }
         break
       case 'image': {
         // Consecutive image blocks share one gallery so several images tile

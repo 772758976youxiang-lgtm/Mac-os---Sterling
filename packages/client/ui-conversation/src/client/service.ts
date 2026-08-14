@@ -162,7 +162,7 @@ export class ConversationController extends Service implements IConversation {
    * @returns ordered draft descriptors.
    */
   createDraftImages(files: readonly File[]): readonly ComposerAttachment[] {
-    for (const file of files) imageMediaType(file.type)
+    for (const file of files) imageMediaType(file.type, file.name)
     return files.map((file) => {
       const attachment = browserDraftAttachment(file)
       this.draftAttachments.set(attachment.id, attachment)
@@ -316,22 +316,43 @@ export class ConversationController extends Service implements IConversation {
   private serializeImages(images: readonly File[]): Promise<Parameters<SessionFace['prompt']>[0]> {
     return Promise.all(images.map(async file => ({
       type: 'image' as const,
-      mediaType: imageMediaType(file.type),
+      mediaType: imageMediaType(file.type, file.name),
       data: bytesToBase64(new Uint8Array(await file.arrayBuffer())),
       ...(file.name === '' ? {} : { name: file.name }),
     })))
   }
 }
 
-function imageMediaType(value: string): ImageMediaType {
-  switch (value) {
+function imageMediaType(value: string, name: string): ImageMediaType {
+  const mediaType = value.toLowerCase()
+  switch (mediaType) {
     case 'image/png':
+      return 'image/png'
     case 'image/jpeg':
+      return 'image/jpeg'
     case 'image/webp':
+      return 'image/webp'
     case 'image/gif':
-      return value
+      return 'image/gif'
+    case 'image/avif':
+      return 'image/avif'
+    // Browsers commonly label an iPhone capture as image/heic while sharp
+    // reports the same container as HEIF. Keep one canonical wire spelling.
+    case 'image/heic':
+    case 'image/heif':
+      return 'image/heif'
     default:
-      throw new UnsupportedImageMediaTypeError(value)
+      switch (name.slice(name.lastIndexOf('.')).toLowerCase()) {
+        case '.png': return 'image/png'
+        case '.jpg':
+        case '.jpeg': return 'image/jpeg'
+        case '.webp': return 'image/webp'
+        case '.gif': return 'image/gif'
+        case '.avif': return 'image/avif'
+        case '.heic':
+        case '.heif': return 'image/heif'
+        default: throw new UnsupportedImageMediaTypeError(mediaType)
+      }
   }
 }
 

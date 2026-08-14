@@ -57,4 +57,17 @@ describe('tails', () => {
     expect(blank.container.firstChild).toBeNull()
   })
 
+  it('renders the image-generation placeholder only while the request is running', () => {
+    const active = render(
+      <AssistantMarkdown t={t} blocks={[{ kind: 'image-pending' }]} streaming />,
+    )
+    expect(active.getByRole('status').textContent).toContain('正在生成图片…')
+    expect(active.container.querySelector('[data-image-generation-pending]')).toBeTruthy()
+
+    const stopped = render(
+      <AssistantMarkdown t={t} blocks={[{ kind: 'image-pending' }]} streaming={false} />,
+    )
+    expect(stopped.container.firstChild).toBeNull()
+  })
+
 })

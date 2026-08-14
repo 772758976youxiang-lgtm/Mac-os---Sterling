@@ -133,17 +133,17 @@ describe('serializeMessages', () => {
     expect(wire).toEqual([{ role: 'user', content: 'see chart' }])
   })
 
-  it('rejects image blocks instead of silently flattening them away', () => {
-    expect(() => serializeMessages([createUserMessage({
+  it('omits historical image blocks while preserving accompanying text', () => {
+    expect(serializeMessages([createUserMessage({
       content: [{
         type: 'image',
         attachment: {
           attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
           mediaType: 'image/png', bytes: 68, width: 1, height: 1,
         },
-      }],
+      }, { type: 'text', text: 'Describe this image.' }],
       source: { kind: 'plugin', plugin: 'test' },
-    })])).toThrow(expect.objectContaining({ code: 'UNSUPPORTED_CONTENT' }))
+    })])).toEqual([{ role: 'user', content: 'Describe this image.' }])
   })
 
   it('emits an empty user message rather than dropping block-less messages', () => {

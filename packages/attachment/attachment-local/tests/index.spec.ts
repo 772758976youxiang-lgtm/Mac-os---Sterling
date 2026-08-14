@@ -20,7 +20,7 @@ describe('local attachment service', () => {
       maxImagesPerMessage: DEFAULT_MAX_IMAGES_PER_MESSAGE,
       maxMessageImageBytes: DEFAULT_MAX_MESSAGE_IMAGE_BYTES,
       maxImagePixels: DEFAULT_MAX_IMAGE_PIXELS,
-      mediaTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+      mediaTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'image/heif'],
     })
   })
 

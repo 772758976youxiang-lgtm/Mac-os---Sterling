@@ -111,6 +111,12 @@ describe('ConversationController', () => {
       new File([Uint8Array.of(2)], 'invalid.svg', { type: 'image/svg+xml' }),
     ])).toThrow(UnsupportedImageMediaTypeError)
     expect(created).not.toHaveBeenCalled()
+    const accepted = b.root.createDraftImages([
+      new File([Uint8Array.of(3)], 'camera.heic', { type: 'image/heic' }),
+      new File([Uint8Array.of(4)], 'no-mime.HEIC'),
+    ])
+    expect(accepted.map(attachment => attachment.file.name)).toEqual(['camera.heic', 'no-mime.HEIC'])
+    expect(created).toHaveBeenCalledTimes(2)
     created.mockRestore()
     await b.runtime.dispose()
   })

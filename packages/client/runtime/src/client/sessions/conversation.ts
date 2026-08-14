@@ -44,6 +44,8 @@ export interface AssistantProvenanceView {
 export type AssistantBlock =
   | { kind: 'text'; text: string }
   | { kind: 'reasoning'; text: string }
+  /** An Image API request is in flight; it is replaced by an `image` block on success. */
+  | { kind: 'image-pending' }
   | { kind: 'image'; attachment: ImageAttachmentRef }
   | { kind: 'tool-call'; callId: string; name: string; argsRaw: string }
   | { kind: 'other'; block: unknown }

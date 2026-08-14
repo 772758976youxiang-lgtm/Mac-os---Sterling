@@ -12,7 +12,7 @@ import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatu
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
 import { AttachmentError } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import { contentHasImage, createUserMessage, freezeMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, freezeMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import { isAppendSurfaceEvent, isJsonValue } from '@deepseek-ai/dsh-session'
@@ -229,11 +229,6 @@ function imageInEvent(event: SessionEvent, match: (ref: ImageAttachmentRef) => b
     return imageBlockIn([data.chunk.block], match)
   }
   return undefined
-}
-
-/** True when the current model-visible surface contains an image. */
-function messagesHaveImage(messages: readonly { content: readonly ContentBlock[] }[]): boolean {
-  return messages.some(message => contentHasImage(message.content))
 }
 
 /** Resolve the first reference matching one opaque id. */
@@ -649,6 +644,8 @@ export interface ApiProxyDefaults {
    * and undoing it because storage failed would be the worse outcome.
    */
   saveDefaultModelSelection?: (selection: ModelSelection) => Promise<void>
+  /** Image-capable route used for one turn when the selected model is text-only. */
+  imageFallback?: ModelSelection
   /** Default project directory for new sessions whose create request carries no cwd. */
   cwd: string
   /** Native open-with-default-application; injectable for carrier tests. */
@@ -1137,6 +1134,42 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const result = (imageAdmissionChains.get(agent) ?? Promise.resolve()).then(operation)
     imageAdmissionChains.set(agent, result.then(() => undefined, () => undefined))
     return result
+  }
+
+  /** Resolve the configured vision route and require its declared image capability. */
+  async function resolveImageFallback(): Promise<ModelSelection | undefined> {
+    if (defaults.imageFallback === undefined) return undefined
+    const resolved = await ctx.llm.resolveCallConfig(defaults.imageFallback)
+    const info = await ctx.llm.resolveModelInfo(resolved.provider, resolved.model)
+    if (info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
+      throw new Error(`configured image fallback model "${resolved.model}" does not accept image input`)
+    }
+    return {
+      provider: resolved.provider,
+      model: resolved.model,
+      ...resolved.reasoningEffort === undefined ? {} : { reasoningEffort: resolved.reasoningEffort },
+    }
+  }
+
+  /** Restore the original selection only after the vision turn has reached idle. */
+  function useImageFallback(agent: Agent, previous: ModelSelection, fallback: ModelSelection): () => void {
+    const selection = selectionFor(agent)
+    let restored = false
+    const restore = (): void => {
+      if (restored) return
+      restored = true
+      dispose()
+      const active = selection.current
+      if (active.provider === fallback.provider && active.model === fallback.model
+        && active.reasoningEffort === fallback.reasoningEffort) {
+        selection.current = previous
+      }
+    }
+    const dispose = ctx.on('agent/status', ({ agent: subject, status }) => {
+      if (subject === agent && status === 'idle') restore()
+    })
+    selection.current = fallback
+    return restore
   }
 
   /**
@@ -2292,18 +2325,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 ? {}
                 : { reasoningEffort: ReasoningEffortId(reasoningEffort) },
             })
-            const pendingImage = [...found.agent.inbox.nextTurn, ...found.agent.inbox.nextStep]
-              .some(message => contentHasImage(message.content))
-            if (pendingImage || messagesHaveImage(found.agent.session.deriveMessages())) {
-              const info = await ctx.llm.resolveModelInfo(resolved.provider, resolved.model)
-              if (info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
-                return err(request, {
-                  code: 'model-unavailable',
-                  message: `Model "${resolved.model}" does not accept image input, but this session already contains images; select an image-capable model.`,
-                  details: { provider, model },
-                })
-              }
-            }
             const selected: ModelSelection = {
               provider: resolved.provider,
               model: resolved.model,
@@ -2482,21 +2503,34 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const hasImage = content.some(part => part.type === 'image')
         const admit = async (): Promise<RpcResponse<{ accepted: true }>> => {
           try {
+            let fallback: ModelSelection | undefined
+            let selected: ModelSelection | undefined
             if (hasImage) {
-              const current = selectionFor(agent).current
-              const modelInfo = await ctx.llm.resolveModelInfo(current.provider, current.model)
+              selected = selectionFor(agent).current
+              const modelInfo = await ctx.llm.resolveModelInfo(selected.provider, selected.model)
               if (modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')) {
-                return err(request, {
-                  code: 'attachment-error',
-                  message: `Model "${current.model}" does not support image input.`,
-                  details: { reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES' },
-                })
+                fallback = await resolveImageFallback()
+                if (fallback === undefined) {
+                  return err(request, {
+                    code: 'attachment-error',
+                    message: `Model "${selected.model}" does not support image input.`,
+                    details: { reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES' },
+                  })
+                }
               }
             }
             const durable = await durablePromptContent(ctx, content)
             const message: UserMessage = createUserMessage({ content: durable, source })
-            if (mode === 'steer') agent.steer(message)
-            else agent.followup(message)
+            const restore = fallback === undefined || selected === undefined
+              ? undefined
+              : useImageFallback(agent, selected, fallback)
+            try {
+              if (mode === 'steer') agent.steer(message)
+              else agent.followup(message)
+            } catch (error: unknown) {
+              restore?.()
+              throw error
+            }
           } catch (error: unknown) {
             if (error instanceof AttachmentError) {
               return err(request, {

@@ -7,7 +7,10 @@ import type {
   SaveImageAttachment,
   StoredImageAttachment,
 } from '@deepseek-ai/dsh-attachment'
-import LlmRuntime, { createUserMessage, CONTEXT_WINDOW_EXCEEDED_CODE, LlmError, ReasoningEffortId, userAgent } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, {
+  createUserMessage, CONTEXT_WINDOW_EXCEEDED_CODE, LlmError, ReasoningEffortId, userAgent,
+} from '@deepseek-ai/dsh-llm'
+import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -18,6 +21,7 @@ import { closeMockServers, mockServer, textEvents } from './mock-server.ts'
 
 afterEach(async () => {
   vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
   await closeMockServers()
 })
 
@@ -57,6 +61,232 @@ beforeEach(() => {
 })
 
 describe('PiAiAdapter provider routing', () => {
+  it('starts an image block before the image API responds', async () => {
+    let reply: ((value: Response) => void) | undefined
+    const fetch = vi.fn(() => new Promise<Response>((resolve) => { reply = resolve }))
+    vi.stubGlobal('fetch', fetch)
+    const attachments = {
+      imageLimits: {
+        maxImageBytes: 4,
+        maxImagesPerMessage: 1,
+        maxMessageImageBytes: 4,
+        maxImagePixels: 4,
+        mediaTypes: ['image/png'],
+      },
+      validateImage: vi.fn(() => Promise.resolve()),
+      saveImage: vi.fn(() => Promise.resolve(IMAGE_REF)),
+    } as unknown as AttachmentStore
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        images: { api: 'openai-image-generations', baseURL: 'https://images.example/v1', models: [{ id: 'gpt-image-2' }] },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      resolveAttachments: () => attachments,
+    })
+    const stream = adapter.stream({
+      provider: 'images', model: 'gpt-image-2', messages: [createUserMessage({
+        content: [{ type: 'text', text: 'A paper boat on a lake' }], source: { kind: 'user' },
+      })],
+    })[Symbol.asyncIterator]()
+
+    await expect(stream.next()).resolves.toMatchObject({
+      value: { type: 'block-start', index: 0, blockType: 'image' }, done: false,
+    })
+    const result = stream.next()
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    reply?.(new Response(JSON.stringify({ data: [{ b64_json: 'AQID' }] }), { status: 200 }))
+    await expect(result).resolves.toMatchObject({
+      value: { type: 'block-end', index: 0, block: { type: 'image', attachment: IMAGE_REF } }, done: false,
+    })
+  })
+
+  it('stores OpenAI image-generation output as assistant image blocks', async () => {
+    const fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ data: [{ b64_json: 'AQID' }] }), {
+      status: 200,
+    })))
+    vi.stubGlobal('fetch', fetch)
+    const validateImage = vi.fn(() => Promise.resolve())
+    const saveImage = vi.fn(() => Promise.resolve(IMAGE_REF))
+    const attachments = {
+      imageLimits: {
+        maxImageBytes: 4,
+        maxImagesPerMessage: 1,
+        maxMessageImageBytes: 4,
+        maxImagePixels: 4,
+        mediaTypes: ['image/png'],
+      },
+      validateImage,
+      saveImage,
+    } as unknown as AttachmentStore
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        images: {
+          api: 'openai-image-generations',
+          baseURL: 'https://images.example/v1',
+          models: [{ id: 'gpt-image-2' }],
+        },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      resolveAttachments: () => attachments,
+    })
+    await expect(adapter.resolveModel('images', 'gpt-image-2')).resolves.toMatchObject({
+      inputModalities: ['text', 'image'],
+    })
+    const chunks: StreamChunk[] = []
+    for await (const chunk of adapter.stream({
+      provider: 'images', model: 'gpt-image-2', messages: [createUserMessage({
+        content: [{ type: 'text', text: 'A paper boat on a lake' }], source: { kind: 'user' },
+      })],
+    })) chunks.push(chunk)
+
+    expect(fetch).toHaveBeenCalledWith('https://images.example/v1/images/generations', expect.objectContaining({
+      body: expect.stringContaining('"prompt":"A paper boat on a lake"'),
+    }))
+    expect(validateImage).toHaveBeenCalledWith({ data: Uint8Array.of(1, 2, 3), mediaType: 'image/png' })
+    expect(chunks).toEqual([
+      { type: 'block-start', index: 0, blockType: 'image' },
+      { type: 'block-end', index: 0, block: { type: 'image', attachment: IMAGE_REF } },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ])
+  })
+
+  it('uploads a latest-message reference image to the image-edit endpoint', async () => {
+    const fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ data: [{ b64_json: 'AQID' }] }), {
+      status: 200,
+    })))
+    vi.stubGlobal('fetch', fetch)
+    const attachments = {
+      imageLimits: {
+        maxImageBytes: 4,
+        maxImagesPerMessage: 1,
+        maxMessageImageBytes: 4,
+        maxImagePixels: 4,
+        mediaTypes: ['image/png'],
+      },
+      readImage: vi.fn(() => Promise.resolve({ ref: IMAGE_REF, data: Uint8Array.of(4, 5) })),
+      validateImage: vi.fn(() => Promise.resolve()),
+      saveImage: vi.fn(() => Promise.resolve(IMAGE_REF)),
+    } as unknown as AttachmentStore
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        images: {
+          api: 'openai-image-generations',
+          baseURL: 'https://images.example/v1',
+          models: [{ id: 'gpt-image-2' }],
+        },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      resolveAttachments: () => attachments,
+    })
+
+    for await (const _chunk of adapter.stream({
+      provider: 'images', model: 'gpt-image-2', messages: [createUserMessage({
+        content: [
+          { type: 'text', text: 'Turn this into a watercolor painting' },
+          { type: 'image', attachment: IMAGE_REF },
+        ],
+        source: { kind: 'user' },
+      })],
+    })) {
+      // Consume the response so the image is validated and saved.
+    }
+
+    expect(attachments.readImage).toHaveBeenCalledWith(IMAGE_REF, undefined)
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://images.example/v1/images/edits')
+    expect(init.body).toBeInstanceOf(FormData)
+    const form = init.body as FormData
+    expect(form.get('prompt')).toBe('Turn this into a watercolor painting')
+    expect(form.getAll('image[]')).toHaveLength(1)
+  })
+
+  it('uses the submitted prompt and image when runtime context follows it', async () => {
+    const fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ data: [{ b64_json: 'AQID' }] }), {
+      status: 200,
+    })))
+    vi.stubGlobal('fetch', fetch)
+    const attachments = {
+      imageLimits: {
+        maxImageBytes: 4,
+        maxImagesPerMessage: 1,
+        maxMessageImageBytes: 4,
+        maxImagePixels: 4,
+        mediaTypes: ['image/png'],
+      },
+      readImage: vi.fn(() => Promise.resolve({ ref: IMAGE_REF, data: Uint8Array.of(4, 5) })),
+      validateImage: vi.fn(() => Promise.resolve()),
+      saveImage: vi.fn(() => Promise.resolve(IMAGE_REF)),
+    } as unknown as AttachmentStore
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        images: { api: 'openai-image-generations', baseURL: 'https://images.example/v1', models: [{ id: 'gpt-image-2' }] },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      resolveAttachments: () => attachments,
+    })
+
+    for await (const _chunk of adapter.stream({
+      provider: 'images', model: 'gpt-image-2', messages: [
+        createUserMessage({
+          content: [{ type: 'text', text: 'Use this reference as a watercolor' }, { type: 'image', attachment: IMAGE_REF }],
+          source: { kind: 'user' },
+        }),
+        createUserMessage({
+          content: [{ type: 'text', text: '<runtime-context>do not use this as an image prompt</runtime-context>' }],
+          source: { kind: 'plugin', plugin: '@deepseek-ai/dsh-system-prompt' },
+        }),
+      ],
+    })) {
+      // Consume the completed image result.
+    }
+
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://images.example/v1/images/edits')
+    const form = init.body as FormData
+    expect(form.get('prompt')).toBe('Use this reference as a watercolor')
+    expect(form.getAll('image[]')).toHaveLength(1)
+  })
+
+  it('does not reuse an earlier prompt when the latest user message has no text', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        images: {
+          api: 'openai-image-generations',
+          baseURL: 'https://images.example/v1',
+          models: [{ id: 'gpt-image-2' }],
+        },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      resolveAttachments: () => ({
+        imageLimits: {
+          maxImageBytes: 4,
+          maxImagesPerMessage: 1,
+          maxMessageImageBytes: 4,
+          maxImagePixels: 4,
+          mediaTypes: ['image/png'],
+        },
+      }) as unknown as AttachmentStore,
+    })
+
+    const messages = [
+      createUserMessage({
+        content: [{ type: 'text', text: 'Earlier prompt' }], source: { kind: 'user' },
+      }),
+      createUserMessage({
+        content: [{ type: 'image', attachment: IMAGE_REF }],
+        source: { kind: 'user' },
+      }),
+    ]
+    await expect(async () => {
+      for await (const _chunk of adapter.stream({ provider: 'images', model: 'gpt-image-2', messages })) {
+        // Iterate so the generator evaluates its request validation.
+      }
+    }).rejects.toThrow('requires text in the latest user message')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('resolves a catalog model dynamically and uses a private endpoint', async () => {
     const server = await mockServer([{ events: textEvents }])
     const ctx = await harness(server.url)
@@ -411,7 +641,7 @@ describe('provider profile lifecycle', () => {
     expect(typeof info.context?.contextWindow).toBe('number')
   })
 
-  it('exposes pi-ai model thinking levels verbatim without inventing a provider default', async () => {
+  it('exposes pi-ai model thinking levels with a user-facing Ultra top tier and no provider default', async () => {
     const ctx = new Context()
     await ctx.plugin(LlmRuntime)
     await ctx.plugin(LlmPiAi, {
@@ -424,7 +654,7 @@ describe('provider profile lifecycle', () => {
           efforts: [
             { id: ReasoningEffortId('off'), name: 'Off' },
             { id: ReasoningEffortId('high'), name: 'High' },
-            { id: ReasoningEffortId('max'), name: 'Max' },
+            { id: ReasoningEffortId('max'), name: 'Ultra' },
           ],
         },
       })

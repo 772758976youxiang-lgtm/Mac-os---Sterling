@@ -5,7 +5,7 @@ import type { AttachmentId } from './brand.ts'
 export type { AttachmentId } from './brand.ts'
 
 /** Raster image formats accepted by the version-one attachment path. */
-export type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+export type ImageMediaType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | 'image/avif' | 'image/heif'
 
 /** Durable, serializable metadata for one immutable image object. */
 export interface ImageAttachmentRef {

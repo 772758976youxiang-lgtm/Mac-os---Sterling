@@ -17,6 +17,73 @@
   gap: 16px;
 }
 
+.imageGenerationPending {
+  align-self: flex-start;
+  width: min(100%, 220px);
+}
+
+.imageGenerationLabel {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.imageGenerationCanvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.imageGenerationCanvas::before,
+.imageGenerationCanvas::after {
+  position: absolute;
+  inset: -24%;
+  content: '';
+  mask-image: radial-gradient(ellipse at center, var(--dsw-alias-label-primary) 0 32%, transparent 72%);
+  will-change: transform, opacity;
+}
+
+.imageGenerationCanvas::before {
+  background-image: radial-gradient(circle, var(--dsw-alias-brand-primary-new-colorprimary-new-color) 0 1.5px, transparent 1.8px);
+  background-size: 36px 36px;
+  animation: dsh-image-generation-accent 3.2s ease-in-out infinite;
+}
+
+.imageGenerationCanvas::after {
+  background-image: radial-gradient(circle, var(--dsw-alias-border-l2-darkmode-thin) 0 1px, transparent 1.25px);
+  background-size: 18px 18px;
+  opacity: 0.5;
+  animation: dsh-image-generation-drift 5s ease-in-out infinite alternate;
+}
+
+@keyframes dsh-image-generation-accent {
+  0%,
+  100% {
+    opacity: 0.06;
+    transform: translate3d(-18px, 14px, 0);
+  }
+
+  50% {
+    opacity: 0.42;
+    transform: translate3d(18px, -14px, 0);
+  }
+}
+
+@keyframes dsh-image-generation-drift {
+  from {
+    transform: translate3d(-8px, -6px, 0);
+  }
+
+  to {
+    transform: translate3d(8px, 6px, 0);
+  }
+}
+
 /* Interrupted-turn terminal marker: quiet inline tag, no animation. */
 .stopped {
   align-self: flex-start;
@@ -33,4 +100,11 @@
   margin-top: 16px;
   /* Optical align with 28px icon hit targets that pad 6px past the glyph. */
   margin-left: -6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imageGenerationCanvas::before,
+  .imageGenerationCanvas::after {
+    animation: none;
+  }
 }

@@ -111,6 +111,7 @@ export function emptyAssistantBlock(blockType: string): AssistantBlock {
   switch (blockType) {
     case 'text': return { kind: 'text', text: '' }
     case 'reasoning': return { kind: 'reasoning', text: '' }
+    case 'image': return { kind: 'image-pending' }
     case 'tool-call': return { kind: 'tool-call', callId: '', name: '', argsRaw: '' }
     default: return { kind: 'other', block: null }
   }

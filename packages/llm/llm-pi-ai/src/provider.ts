@@ -25,6 +25,7 @@ import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messag
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy'
 import { catalogProvider } from './catalog.ts'
+import { OPENAI_IMAGE_GENERATIONS_API } from './image-generation.ts'
 
 /**
  * Wire protocols a configured route may name, mapped to pi-ai's lazily loaded
@@ -48,6 +49,9 @@ const PROTOCOLS: Readonly<Record<string, () => ProviderStreams>> = {
   'openai-completions': openAICompletionsApi,
   'openai-responses': openAIResponsesApi,
   'anthropic-messages': anthropicMessagesApi,
+  // Image routes still use the chat provider as a model-directory container.
+  // PiAiAdapter intercepts their dispatch before pi-ai's chat stream runs.
+  [OPENAI_IMAGE_GENERATIONS_API]: openAICompletionsApi,
 }
 
 /**
