@@ -80,7 +80,7 @@ export type {
   ResolvedPiAiProviderProfile,
 } from './config.ts'
 export type { OpenAIImageGenerationConfig } from './image-generation.ts'
-export { supportedProtocols } from './provider.ts'
+export { MINIMAX_H3_API, supportedProtocols } from './provider.ts'
 
 export const name = 'llm-pi-ai'
 export const inject = ['llm']

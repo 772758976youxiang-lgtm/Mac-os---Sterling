@@ -71,6 +71,21 @@ Configure credentials, the model catalog, and deployment-specific transport sett
               max: ultra
 ```
 
+### MiniMax H3
+
+Select `minimax-h3` for a MiniMax H3 deployment that uses MiniMax's OpenAI-compatible Chat Completions API. It sends the configured model and conversation to `<baseURL>/chat/completions` with Bearer API-key authentication, retains the assistant reply for later turns, and supports streaming. The Models page can read the deployment's `GET <baseURL>/models` list. The protocol name is a configuration-level MiniMax dialect label; its request and response parser is pi-ai's `openai-completions` implementation. Set `baseURL` to the MiniMax-compatible API prefix, such as `https://api.minimax.io/v1`, and enter the deployment's exact model id in `models`.
+
+```yaml
+providers:
+  minimax-h3:
+    displayName: MiniMax H3
+    apiKeyEnv: MINIMAX_H3_API_KEY
+    api: minimax-h3
+    baseURL: https://api.minimax.io/v1
+    models:
+      - id: MiniMax-H3
+```
+
 ### OpenAI image generation
 
 Select `openai-image-generations` for a route whose models implement OpenAI's Image API. The route declares text and image input by default, so attaching a reference image keeps the selected image model rather than invoking the host's vision-model fallback. A text-only message posts JSON to `/images/generations`; a message with one or more images reads their durable bytes and posts multipart `image[]` fields to `/images/edits`. Both send the latest user text as `prompt`, ask for the configured image response encoding, save every returned raster through the durable attachment service, and emit assistant image blocks for the conversation view. The defaults match the supplied invocation: `1024x1024`, `high`, one image, and `b64_json`.

@@ -2,14 +2,15 @@
  * Shared tsdown preset for UI plugin client bundles. Emits a closure-factory
  * artifact: the bundle calls window.__ModuleLoader__.load({id, factory})
  * and resolves externals through the injected require (loader module table —
- * cordis DI entities, no globals, no import map). CSS Modules are compiled by
- * lightningcss inside the bundle: importing `x.module.css` yields the
- * hashed class map, and the css text auto-injects a <style data-plugin="<id>">
+ * cordis DI entities, no globals, no import map). Stylesheets are compiled by
+ * lightningcss inside the bundle: importing `x.module.css` yields the hashed
+ * class map, and each stylesheet auto-injects a <style data-plugin="<id>">
  * tag at factory execution (the loader removes plugin-owned tags on unload).
  * The virtual loader registers each real stylesheet as a watch dependency.
  */
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { basename, dirname, relative, resolve as resolvePath, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { UserConfig } from 'tsdown'
@@ -17,12 +18,13 @@ import { transform } from 'lightningcss'
 import { PLATFORM_MODULES } from './web/src/platform.ts'
 
 /**
- * Virtual-id wrapper keeping module CSS away from tsdown's own css pipeline
- * (which requires @tsdown/css). The suffix matters: tsdown's guard matches ids
- * ending in `.css`, so the virtual id must not.
+ * Virtual-id wrappers keep stylesheets away from tsdown's CSS pipeline. The
+ * suffix matters: tsdown's guard matches ids ending in `.css`, so the virtual
+ * id must not.
  */
 const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
+const GLOBAL_CSS_VIRTUAL_PREFIX = '\0dsh-global-css:'
 
 /**
  * Wire/type layers a client bundle may inline: browser-safe contracts
@@ -258,6 +260,33 @@ function clientConfig(id: string, entry: string): UserConfig {
           `export default ${JSON.stringify(classMap)};`,
         ].join('\n')
       },
+    }, {
+      name: 'dsh-global-css-inline',
+      resolveId(source: string, importer: string | undefined) {
+        if (!source.endsWith('.css') || source.endsWith('.module.css')) return null
+        const abs = importer !== undefined ? globalStyleAssetPath(source, importer) : source
+        return GLOBAL_CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
+      },
+      async load(virtualId: string) {
+        if (!virtualId.startsWith(GLOBAL_CSS_VIRTUAL_PREFIX)) return null
+        const fileId = virtualId.slice(GLOBAL_CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+        this.addWatchFile(fileId)
+        const source = await readFile(fileId)
+        const { code } = transform({ filename: fileId, code: source, minify: true })
+        const tagId = `${id}/${basename(fileId)}`
+        return [
+          `const css = ${JSON.stringify(code.toString())};`,
+          `const tagId = ${JSON.stringify(tagId)};`,
+          'if (typeof document !== \'undefined\' && document.querySelector(\'style[data-plugin-css=\' + JSON.stringify(tagId) + \']\') === null) {',
+          '  const tag = document.createElement(\'style\');',
+          `  tag.dataset.plugin = ${JSON.stringify(id)};`,
+          '  tag.dataset.pluginCss = tagId;',
+          '  tag.textContent = css;',
+          '  document.head.appendChild(tag);',
+          '}',
+          'export default {};',
+        ].join('\n')
+      },
     }],
     outputOptions: {
       entryFileNames: 'client.js',
@@ -281,4 +310,10 @@ function sourceAssetPath(source: string, importer: string): string {
   const boundary = emitted.indexOf(marker)
   if (boundary < 0) return emitted
   return resolvePath(emitted.slice(0, boundary), 'src', emitted.slice(boundary + marker.length))
+}
+
+/** Resolve a global stylesheet from either the workspace source tree or a package dependency. */
+function globalStyleAssetPath(source: string, importer: string): string {
+  if (source.startsWith('.') || source.startsWith('/')) return sourceAssetPath(source, importer)
+  return createRequire(importer).resolve(source)
 }

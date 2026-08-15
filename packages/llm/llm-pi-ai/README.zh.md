@@ -71,6 +71,21 @@
               max: ultra
 ```
 
+### MiniMax H3
+
+为采用 MiniMax OpenAI 兼容 Chat Completions API 的 MiniMax H3 部署选择 `minimax-h3`。它使用 Bearer API key 鉴权，将配置的模型和对话发送到 `<baseURL>/chat/completions`，保留助手回复供后续轮次使用，并支持流式响应。Models 页面可读取部署的 `GET <baseURL>/models` 列表。该协议名称是配置层的 MiniMax 方言标识；请求和响应解析复用 pi-ai 的 `openai-completions` 实现。将 `baseURL` 设为 MiniMax 兼容 API 前缀，例如 `https://api.minimax.io/v1`，并在 `models` 中填写部署使用的准确模型 ID。
+
+```yaml
+providers:
+  minimax-h3:
+    displayName: MiniMax H3
+    apiKeyEnv: MINIMAX_H3_API_KEY
+    api: minimax-h3
+    baseURL: https://api.minimax.io/v1
+    models:
+      - id: MiniMax-H3
+```
+
 ### OpenAI 图像生成
 
 若路由下的模型实现 OpenAI Image API，选择 `openai-image-generations`。该路由默认声明文本和图片输入能力，因此附加参考图时会保持当前生图模型，不会触发宿主的视觉模型回退。纯文本消息以 JSON 请求 `/images/generations`；含一张或多张图片的消息会读取其持久化字节，并以 multipart 的 `image[]` 字段请求 `/images/edits`。两种路径都将最新一条用户文本作为 `prompt` 发送，按配置请求图片响应编码，通过持久化附件服务保存每张返回的光栅图，并向会话视图发出助手图片块。默认值与给出的调用一致：`1024x1024`、`high`、一张图和 `b64_json`。

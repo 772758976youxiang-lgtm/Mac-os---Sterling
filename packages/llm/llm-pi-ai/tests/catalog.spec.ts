@@ -95,6 +95,25 @@ describe('hand-declared providers', () => {
     expect(server.headers[0]?.authorization).toBe('Bearer test-key')
   })
 
+  it('uses OpenAI Chat Completions for the MiniMax H3 dialect', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = await harness(gateway(`${server.url}/v1`, { api: 'minimax-h3' }))
+
+    const result = await assemble(ctx, {
+      provider: 'acme-gateway',
+      model: 'acme-large',
+      messages: [createUserMessage({
+        content: [{ type: 'text', text: 'hi' }],
+        source: { kind: 'plugin', plugin: 'test' },
+      })],
+    })
+
+    expect(result.message.content).toEqual([{ type: 'text', text: 'hello' }])
+    expect(result.finish).toEqual({ kind: 'stop' })
+    expect(server.paths).toEqual(['/v1/chat/completions'])
+    expect(server.headers[0]?.authorization).toBe('Bearer test-key')
+  })
+
   it('lists and resolves the declared models rather than a catalog', async () => {
     const server = await mockServer([])
     const ctx = await harness(gateway(`${server.url}/v1`))
