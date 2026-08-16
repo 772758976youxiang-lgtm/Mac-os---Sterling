@@ -2,8 +2,8 @@
  * Serialize harness messages into DeepSeek chat completions. User text is joined; assistant text
  * becomes `content`, tool calls become `tool_calls`, and tool results become separate tool messages.
  * Assistant reasoning is replayed as `reasoning_content` only on tool-call turns, as required by
- * thinking-mode passback. Historical image blocks are omitted because this wire route is text-only;
- * the vision fallback's textual answer remains available for later DeepSeek turns.
+ * thinking-mode passback. Image blocks become a text notice because this wire route is text-only;
+ * an available image-analysis tool can then read the durable attachment without changing routes.
  * @module dsh-llm-deepseek/serialize
  */
 
@@ -58,6 +58,14 @@ function flattenText(blocks: ContentBlock[]): string {
     .filter(block => block.type === 'text')
     .map(block => block.text)
     .join('')
+}
+
+/** Tell a text-only route that durable image bytes are available to an image-analysis tool. */
+function userText(blocks: ContentBlock[]): string {
+  const text = flattenText(blocks)
+  if (!blocks.some(block => block.type === 'image')) return text
+  const notice = '[The user attached an image. This route cannot inspect image bytes directly; use an available image-analysis tool when needed.]'
+  return text === '' ? notice : `${text}\n${notice}`
 }
 
 /** Serialize one assistant message (text + reasoning + tool calls). */
@@ -116,7 +124,7 @@ export function serializeMessages(messages: Message[]): WireMessage[] {
     // user role: tool results ride in user messages in the harness
     // vocabulary, but DeepSeek wants them as role:'tool' messages.
     const toolResults = message.content.filter(block => block.type === 'tool-result')
-    const text = flattenText(message.content)
+    const text = userText(message.content)
     if (text.length > 0 || toolResults.length === 0) {
       wire.push({ role: 'user', content: text })
     }

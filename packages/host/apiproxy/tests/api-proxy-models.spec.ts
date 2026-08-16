@@ -128,19 +128,10 @@ function registerTextOnly(ctx: Context): void {
   }('Text Only', []))
 }
 
-function registerImageCapable(ctx: Context): void {
-  ctx.llm.registerAdapter(['vision'], new class extends CatalogAdapter {
-    override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
-      return Promise.resolve({ provider, id: model, name: model, inputModalities: ['text', 'image'] })
-    }
-  }('Vision', []))
-}
-
 describe('Web session model selection', () => {
-  it('routes an image turn through the configured vision model, then restores the text-only selection', async () => {
+  it('keeps a text-only model selected when a user attaches an image', async () => {
     const { ctx, agent, sessionId } = await harness()
     registerTextOnly(ctx)
-    registerImageCapable(ctx)
     ctx.provide('attachments', {
       imageLimits: {
         maxImageBytes: 4,
@@ -158,7 +149,6 @@ describe('Web session model selection', () => {
     Object.assign(agent, { followup })
     const api = createApiProxy(ctx, {
       defaultModelSelection: () => ({ provider: 'text-only', model: 'plain' }),
-      imageFallback: { provider: 'vision', model: 'vision-model' },
       cwd: '/tmp',
     })
 
@@ -169,7 +159,7 @@ describe('Web session model selection', () => {
     })))
     expect(followup).toHaveBeenCalledOnce()
     expect(expectValue(await api.sessions.models(request({ sessionId }))).current)
-      .toEqual({ provider: 'vision', model: 'vision-model' })
+      .toEqual({ provider: 'text-only', model: 'plain' })
 
     agentEvents(ctx, agent).emit('agent/status', { status: 'idle' })
     expect(expectValue(await api.sessions.models(request({ sessionId }))).current)
@@ -305,6 +295,48 @@ describe('Web session model selection', () => {
     expect(readImage).toHaveBeenCalledOnce()
     await ctx.fiber.dispose()
   })
+
+  it('authorizes complete image references persisted in tool presentation metadata', async () => {
+    const { ctx, agent, sessionId } = await harness()
+    const ref = {
+      attachmentId: 'att-tool-image', mediaType: 'image/png' as const, bytes: 2, width: 1, height: 1,
+    }
+    const readImage = vi.fn(() => Promise.resolve({ ref, data: Uint8Array.of(1, 2) }))
+    ctx.provide('attachments', { readImage } as never)
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+    agent.session.append('tool/result', {
+      turn: 1,
+      step: 1,
+      message: {
+        id: 'tool-image-result',
+        role: 'user',
+        source: { kind: 'tool', callId: 'call-image' },
+        content: [{
+          type: 'tool-result', toolCallId: 'call-image', isError: false,
+          content: [{ type: 'text', text: 'Generated one image.' }],
+        }],
+      },
+      meta: { images: [ref, { attachmentId: 'incomplete' }] },
+    } as never, { surfaceOp: 'append' })
+
+    const allowed = await api.sessions.attachment(request({
+      sessionId, attachmentId: 'att-tool-image' as never,
+    }))
+    expect(allowed.result).toMatchObject({ ok: true, value: { attachment: ref, data: 'AQI=' } })
+    const denied = await api.sessions.attachment(request({
+      sessionId, attachmentId: 'incomplete' as never,
+    }))
+    expect(denied.result).toMatchObject({
+      ok: false,
+      error: { code: 'attachment-error', details: { reason: 'ATTACHMENT_NOT_REFERENCED' } },
+    })
+    expect(readImage).toHaveBeenCalledOnce()
+    await ctx.fiber.dispose()
+  })
+
   it('groups successful providers and leaves an unlisted current selection out of the catalog', async () => {
     const { ctx, sessionId } = await harness({
       provider: 'deepseek-official',

@@ -25,13 +25,26 @@ async function harness(): Promise<{
   await ctx.plugin(Loader)
   ctx.loader.builtins.active = activePlugin
   ctx.loader.builtins.pending = pendingPlugin
+  ctx.loader.internal = {
+    import: async (name: string) => {
+      if (name === '@deepseek-ai/dsh-mcp-client' || name === '@deepseek-ai/dsh-mcp-image-generation') return activePlugin
+      throw new Error(`unexpected module ${name}`)
+    },
+  } as never
+  ctx.provide('tools', {
+    schemas: () => [
+      { name: 'mcp__github__create_issue', description: 'Create a GitHub issue', parameters: {} },
+      { name: 'mcp__github__list_issues', description: 'List GitHub issues', parameters: {} },
+      { name: 'web_search', description: 'Search the web', parameters: {} },
+    ],
+  } as never)
   await ctx.plugin(PluginInventoryGateway)
   const inventory = ctx.get('pluginInventory') as PluginInventoryGateway
   return { ctx, inventory }
 }
 
 describe('PluginInventoryGateway', () => {
-  it('publishes one direct list method under the pluginInventory namespace', async () => {
+  it('publishes direct plugin and MCP inventory methods under the pluginInventory namespace', async () => {
     const { inventory } = await harness()
     expect(inventory.typertRemote).toMatchObject({
       serviceKey: 'pluginInventory',
@@ -39,7 +52,59 @@ describe('PluginInventoryGateway', () => {
     })
     expect(remoteMethods(inventory)).toEqual([
       { method: 'list', invocation: { kind: 'direct' } },
+      { method: 'mcp', invocation: { kind: 'direct' } },
     ])
+  })
+
+  it('projects configured MCP clients with only their discovered public tools', async () => {
+    const { ctx, inventory } = await harness()
+    const githubId = await ctx.loader.create({
+      name: '@deepseek-ai/dsh-mcp-client',
+      config: { serverName: 'github', transport: 'stdio' },
+    })
+    const brokenId = await ctx.loader.create({
+      name: '@deepseek-ai/dsh-mcp-client',
+      config: { serverName: 'broken', transport: 'streamable-http' },
+      disabled: true,
+    })
+
+    expect(inventory.mcp()).toEqual({
+      servers: [
+        {
+          entryId: githubId,
+          serverName: 'github',
+          transport: 'stdio',
+          enabled: true,
+          fiberPhase: 'active',
+          tools: [
+            { name: 'mcp__github__create_issue', description: 'Create a GitHub issue' },
+            { name: 'mcp__github__list_issues', description: 'List GitHub issues' },
+          ],
+        },
+        {
+          entryId: brokenId,
+          serverName: 'broken',
+          transport: 'streamable-http',
+          enabled: false,
+          fiberPhase: null,
+          tools: [],
+        },
+      ],
+    })
+  })
+
+  it('includes the local image-generation bridge in the MCP inventory', async () => {
+    const { ctx, inventory } = await harness()
+    const imageId = await ctx.loader.create({ name: '@deepseek-ai/dsh-mcp-image-generation' })
+    expect(inventory.mcp()).toMatchObject({
+      servers: [{
+        entryId: imageId,
+        serverName: 'image',
+        transport: 'local',
+        enabled: true,
+        fiberPhase: 'active',
+      }],
+    })
   })
 
   it('projects current non-group Loader entries without a second cache', async () => {

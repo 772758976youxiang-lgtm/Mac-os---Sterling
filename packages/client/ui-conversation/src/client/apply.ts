@@ -27,6 +27,9 @@ import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
 import { InputBar } from './skeleton/InputBar.tsx'
 import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
 import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
+import { ContextInjectionVisibilityRow } from './settings/ContextInjectionVisibilityRow.tsx'
+import type { ContextInjectionVisibilityRowInjected } from './settings/ContextInjectionVisibilityRow.tsx'
+import { ConversationDisplaySettings } from './settings/conversation-display-settings.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { StatsLine } from './chat/StatsLine.tsx'
 import { ApprovalPanel } from './skeleton/ApprovalPanel.tsx'
@@ -130,9 +133,9 @@ export function apply(ctx: Context): void {
 
   // Apply-time construction keeps store identity bound to this fiber.
   const chatStore = createChatStore()
-  const submissionPolicy = new ComposerSubmissionPolicy(
-    ctx.settingsScope.bind<ConversationSettings>({ namespace: CONVERSATION_SETTINGS_NAMESPACE }),
-  )
+  const conversationSettings = ctx.settingsScope.bind<ConversationSettings>({ namespace: CONVERSATION_SETTINGS_NAMESPACE })
+  const submissionPolicy = new ComposerSubmissionPolicy(conversationSettings)
+  const displaySettings = new ConversationDisplaySettings(conversationSettings)
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -144,6 +147,17 @@ export function apply(ctx: Context): void {
       setBusyEnter: (behavior) => { submissionPolicy.setBusyEnter(behavior) },
     }),
   }, EnterBehaviorRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'context-injection-visibility',
+    order: 30,
+    locale: NS,
+    inject: (): ContextInjectionVisibilityRowInjected => ({
+      hooks: { showContextInjections: displaySettings.showContextInjections },
+      setShowContextInjections: (visible) => { displaySettings.setShowContextInjections(visible) },
+    }),
+  }, ContextInjectionVisibilityRow))
 
   // Chat semantic reader positions by session, surviving view switches and
   // width reflow when the tab ring remounts the view. Deliberately not
@@ -387,6 +401,7 @@ export function apply(ctx: Context): void {
       const conversation = concreteConversation(ctx)
       const scoped = scopedConversation(sessions, sessionId)
       return {
+        hooks: { showContextInjections: displaySettings.showContextInjections },
         openDetails: (target) => {
           actions.select(target)
           layout.openDetails()

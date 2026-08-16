@@ -165,6 +165,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   // Selection rides the REAL chat store (same construction path as
   // production; the view reads it through the PropsStore useStore share).
   const chat = createChatStore().create()
+  const showContextInjections = createSnapshotStore(true)
   const t = makeTranslate(zh, commonZh)
   const toolOwners: Array<{
     callId: string
@@ -277,6 +278,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
       submit: () => {},
     },
     useStore: bindSnapshotSelector(chat),
+    useShowContextInjections: bindSnapshotSelector(showContextInjections),
     actions: chat.actions,
     renderSlot,
     SessionProvider: SessionProviderStub,
@@ -295,7 +297,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   const setSelection = (next: SelectionTarget | null): void => { chat.actions.select(next) }
   return {
     set, ChatView, props, openDetails, openFile, loadOlder, inspectCall,
-    chatScroll, forkAt, setSelection, toolOwners,
+    chatScroll, forkAt, setSelection, showContextInjections, toolOwners,
   }
 }
 
@@ -326,6 +328,27 @@ function installScrollMetrics(element: HTMLElement, initialHeight: number, clien
 }
 
 describe('Chat node rendering', () => {
+
+  it('hides context-injection rows live without removing other transcript nodes', () => {
+    const context = {
+      kind: 'context', seq: 2, time: 2_000, content: [], source: null,
+      provenance: { role: 'inject', label: 'time-context' },
+      form: null,
+    } as const satisfies ConversationNode
+    const h = makeHarness({ nodes: [user(1, 'hello'), context, assistant(3, 'hi')] })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.container.querySelectorAll('[data-chat-flow-kind="context"]')).toHaveLength(1)
+    expect(view.container.querySelectorAll('[data-chat-flow-kind="user"]')).toHaveLength(1)
+    expect(view.getByText('hi')).toBeDefined()
+
+    act(() => { h.showContextInjections.set(false) })
+    expect(view.container.querySelectorAll('[data-chat-flow-kind="context"]')).toHaveLength(0)
+    expect(view.container.querySelectorAll('[data-chat-flow-kind="user"]')).toHaveLength(1)
+    expect(view.getByText('hi')).toBeDefined()
+
+    act(() => { h.showContextInjections.set(true) })
+    expect(view.container.querySelectorAll('[data-chat-flow-kind="context"]')).toHaveLength(1)
+  })
 
   it('threads the injected file-mention vocabulary into the closing prose only', () => {
     const wrote = (seq: number, callId: string, path: string): ToolResultNode => ({

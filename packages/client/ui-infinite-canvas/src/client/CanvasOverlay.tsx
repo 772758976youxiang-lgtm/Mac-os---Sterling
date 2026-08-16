@@ -20,7 +20,6 @@ import {
   canvasStorageKey,
   readCanvasDocument,
   writeCanvasDocument,
-  type CanvasNodeRecord,
 } from './stores.ts'
 import css from './CanvasOverlay.module.css'
 
@@ -99,7 +98,7 @@ export function CanvasOverlay({ useStore, actions, t, useSessions, useWorkspaces
   if (mode !== 'infinite') return null
 
   const replaceNodes = (changes: NodeChange<FlowNode>[]): void => {
-    actions.replaceNodes(applyNodeChanges(changes, flowNodes) as CanvasNodeRecord[])
+    actions.replaceNodes(applyNodeChanges(changes, flowNodes))
   }
   const replaceEdges = (changes: EdgeChange[]): void => {
     actions.replaceEdges(applyEdgeChanges(changes, flowEdges))

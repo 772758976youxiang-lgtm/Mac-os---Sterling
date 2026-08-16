@@ -391,6 +391,19 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/compaction/compaction/src/types.ts:33`](../packages/compaction/compaction/src/types.ts)
 
+### `email-digest/*`
+
+<a id="email-digestchange--log-only"></a>
+
+#### `email-digest/change` — log-only
+
+```ts persistence-catalog
+/** Durable result collection and daily delivery markers. */
+'email-digest/change': EmailDigestChange
+```
+
+来源：[`packages/session/email-digest/src/types.ts:45`](../packages/session/email-digest/src/types.ts)
+
 ### `feedback/*`
 
 <a id="feedbackrecord--log-only"></a>

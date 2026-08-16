@@ -195,7 +195,9 @@ function imageRequest(options: GenerateOptions): { prompt: string; references: r
     // Runtime context uses the user role so chat providers can receive it in
     // order. The Image API accepts one prompt, however, and must use the
     // submitted message rather than an injected context contribution.
-    if (message?.role !== 'user' || message.source.kind !== 'user') continue
+    if (message?.role !== 'user'
+      || (message.source.kind !== 'user'
+        && !(options.purpose === 'image-generation' && message.source.kind === 'plugin'))) continue
     const prompt = message.content
       .filter(block => block.type === 'text')
       .map(block => block.text)
@@ -339,6 +341,7 @@ export class PiAiAdapter extends LlmAdapter {
       if (baseURL === undefined || imageGeneration === undefined) {
         throw new LlmError('openai-image-generations requires a resolved base URL and imageGeneration config', 'INVALID_DISCOVERY')
       }
+      const requestImageGeneration = options.imageGeneration
       // Image APIs return only after the full render is ready. Start the first
       // block before that request so clients can show generation progress.
       yield { type: 'block-start', index: 0, blockType: 'image' }
@@ -348,7 +351,7 @@ export class PiAiAdapter extends LlmAdapter {
         prompt: request.prompt,
         ...apiKey === undefined ? {} : { apiKey },
         headers: requestHeaders(profile.headers),
-        config: imageGeneration,
+        config: { ...imageGeneration, ...requestImageGeneration },
         ...inputImages.length === 0 ? {} : {
           images: inputImages.map(image => ({ data: image.data, mediaType: image.ref.mediaType })),
         },
@@ -374,11 +377,8 @@ export class PiAiAdapter extends LlmAdapter {
 
     try {
       const containsImage = options.messages.some(message => contentHasImage(message.content))
-      if (containsImage && !model.input.includes('image')) {
-        throw new LlmError(`pi-ai model "${model.id}" does not support image input`, 'UNSUPPORTED_CONTENT')
-      }
-      const attachments = containsImage ? this.config.resolveAttachments?.() : undefined
-      if (containsImage && attachments === undefined) {
+      const attachments = containsImage && model.input.includes('image') ? this.config.resolveAttachments?.() : undefined
+      if (containsImage && model.input.includes('image') && attachments === undefined) {
         throw new LlmError('pi-ai image input requires the durable attachment service', 'UNSUPPORTED_CONTENT')
       }
       const context = attachments === undefined

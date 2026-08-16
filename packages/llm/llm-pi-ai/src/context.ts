@@ -18,6 +18,14 @@ function flattenText(message: Message): string {
     .join('')
 }
 
+/** Preserve the attachment fact for a text-only model without passing image bytes to it. */
+function textOnlyUserContent(message: Message): string {
+  const text = flattenText(message)
+  if (!message.content.some(block => block.type === 'image')) return text
+  const notice = '[The user attached an image. This route cannot inspect image bytes directly; use an available image-analysis tool when needed.]'
+  return text === '' ? notice : `${text}\n${notice}`
+}
+
 
 /** Flatten text recursively inside one tool result. */
 function toolResultText(blocks: readonly ContentBlock[]): string {
@@ -88,9 +96,6 @@ function textOnlyContext(options: GenerateOptions): PiContext {
   const toolNames = new Map<CallId, string>()
   const messages: PiMessage[] = []
   for (const message of options.messages) {
-    if (contentHasImage(message.content)) {
-      throw new LlmError('pi-ai image conversion requires the durable attachment service', 'UNSUPPORTED_CONTENT')
-    }
     if (message.role === 'system') {
       messages.push({ role: 'user', content: flattenText(message), timestamp: 0 })
       continue
@@ -101,7 +106,7 @@ function textOnlyContext(options: GenerateOptions): PiContext {
       messages.push(assistant)
       continue
     }
-    const text = flattenText(message)
+    const text = textOnlyUserContent(message)
     const results = message.content.filter(block => block.type === 'tool-result')
     if (text.length > 0 || results.length === 0) messages.push({ role: 'user', content: text, timestamp: 0 })
     for (const result of results) {

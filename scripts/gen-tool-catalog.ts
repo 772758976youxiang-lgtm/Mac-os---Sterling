@@ -9,6 +9,7 @@
 import { globSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import LlmRuntime from '@deepseek-ai/dsh-llm'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -26,6 +27,8 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
+import { SettingsProvider } from '@deepseek-ai/dsh-settings'
+import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import PlanModeController from '@deepseek-ai/dsh-plan-mode'
 import WebRuntime from '@deepseek-ai/dsh-web'
@@ -63,6 +66,7 @@ import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
 import VmWorkflowEngine from '@deepseek-ai/dsh-workflow-worker-thread'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
 import * as ToolWorkflow from '@deepseek-ai/dsh-tool-workflow'
+import * as McpImageGeneration from '@deepseek-ai/dsh-mcp-image-generation'
 import { githubSlug } from './verify-md-links.ts'
 
 /** Attachment seam marker that makes the attachments-conditional `read_image` schema harvestable. */
@@ -85,6 +89,21 @@ class CatalogAttachmentStore extends AttachmentStore {
 
   override readImage(_ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
     return Promise.reject(new Error('gen-tool-catalog: attachment reads are unreachable during schema harvest'))
+  }
+}
+
+/** Empty settings provider used only to let schema-producing plugins register namespaces. */
+class CatalogSettings extends SettingsProvider {
+  override get writable(): boolean {
+    return false
+  }
+
+  protected override load(): Promise<Record<string, unknown>> {
+    return Promise.resolve({})
+  }
+
+  protected override persist(_ns: SettingsNamespace, _section: Record<string, unknown>): Promise<void> {
+    return Promise.reject(new Error('gen-tool-catalog: settings writes are unreachable during schema harvest'))
   }
 }
 
@@ -389,6 +408,23 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-mcp-image-generation',
+    dir: 'mcp-image-generation',
+    source: 'packages/mcp/mcp-image-generation/src/index.ts',
+    requires: ['ctx.tools', 'ctx.llm', 'ctx.attachments', 'ctx.settings'],
+    writes: ['tool/call', 'durable image attachments', 'tool/result'],
+    async mount(ctx) {
+      // Registration only needs the service seams. Schema harvesting never
+      // resolves a provider route or writes an attachment.
+      await ctx.plugin(LlmRuntime)
+      await ctx.plugin(CatalogAttachmentStore)
+      await ctx.plugin(CatalogSettings)
+      await ctx.plugin(McpImageGeneration)
+    },
+    note:
+      'The MCP-shaped name is stable so text models can call the configured image route without receiving its credentials. Image bytes remain durable attachments; only the compact completion summary enters model context.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',

@@ -111,3 +111,24 @@
   line-height: 1.5;
   color: var(--dsw-alias-label-tertiary);
 }
+
+.toggleField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.toggle {
+  width: 36px;
+  height: 20px;
+  flex: none;
+  margin: 0;
+  accent-color: var(--dsw-alias-brand-primary);
+  cursor: pointer;
+}
+
+.toggle:disabled {
+  cursor: default;
+}

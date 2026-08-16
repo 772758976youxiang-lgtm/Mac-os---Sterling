@@ -137,11 +137,16 @@ describe('PiAiAdapter provider routing', () => {
       provider: 'images', model: 'gpt-image-2', messages: [createUserMessage({
         content: [{ type: 'text', text: 'A paper boat on a lake' }], source: { kind: 'user' },
       })],
+      imageGeneration: { size: '1536x1024', quality: 'medium', n: 2 },
     })) chunks.push(chunk)
 
-    expect(fetch).toHaveBeenCalledWith('https://images.example/v1/images/generations', expect.objectContaining({
-      body: expect.stringContaining('"prompt":"A paper boat on a lake"'),
-    }))
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://images.example/v1/images/generations')
+    if (typeof init.body !== 'string') throw new Error('expected a JSON image-generation request')
+    const requestBody: unknown = JSON.parse(init.body)
+    expect(requestBody).toMatchObject({
+      prompt: 'A paper boat on a lake', size: '1536x1024', quality: 'medium', n: 2,
+    })
     expect(validateImage).toHaveBeenCalledWith({ data: Uint8Array.of(1, 2, 3), mediaType: 'image/png' })
     expect(chunks).toEqual([
       { type: 'block-start', index: 0, blockType: 'image' },
@@ -187,6 +192,7 @@ describe('PiAiAdapter provider routing', () => {
         ],
         source: { kind: 'user' },
       })],
+      imageGeneration: { size: '1024x1536', quality: 'low', n: 3 },
     })) {
       // Consume the response so the image is validated and saved.
     }
@@ -197,6 +203,9 @@ describe('PiAiAdapter provider routing', () => {
     expect(init.body).toBeInstanceOf(FormData)
     const form = init.body as FormData
     expect(form.get('prompt')).toBe('Turn this into a watercolor painting')
+    expect(form.get('size')).toBe('1024x1536')
+    expect(form.get('quality')).toBe('low')
+    expect(form.get('n')).toBe('3')
     expect(form.getAll('image[]')).toHaveLength(1)
   })
 
@@ -245,6 +254,78 @@ describe('PiAiAdapter provider routing', () => {
     const form = init.body as FormData
     expect(form.get('prompt')).toBe('Use this reference as a watercolor')
     expect(form.getAll('image[]')).toHaveLength(1)
+  })
+
+  it('accepts a plugin prompt for an explicit image-generation auxiliary call', async () => {
+    const fetch = vi.fn(() => Promise.resolve(new Response(JSON.stringify({ data: [{ b64_json: 'AQID' }] }), {
+      status: 200,
+    })))
+    vi.stubGlobal('fetch', fetch)
+    const attachments = {
+      imageLimits: {
+        maxImageBytes: 4,
+        maxImagesPerMessage: 1,
+        maxMessageImageBytes: 4,
+        maxImagePixels: 4,
+        mediaTypes: ['image/png'],
+      },
+      validateImage: vi.fn(() => Promise.resolve()),
+      saveImage: vi.fn(() => Promise.resolve(IMAGE_REF)),
+    } as unknown as AttachmentStore
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        images: { api: 'openai-image-generations', baseURL: 'https://images.example/v1', models: [{ id: 'gpt-image-2' }] },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      resolveAttachments: () => attachments,
+    })
+
+    for await (const _chunk of adapter.stream({
+      provider: 'images',
+      model: 'gpt-image-2',
+      purpose: 'image-generation',
+      messages: [createUserMessage({
+        content: [{ type: 'text', text: 'A cobalt kingfisher on a branch' }],
+        source: { kind: 'plugin', plugin: 'mcp-image-generation' },
+      })],
+    })) {
+      // Consume the completed image result.
+    }
+
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    if (typeof init.body !== 'string') throw new Error('expected a JSON image-generation request')
+    expect(JSON.parse(init.body)).toMatchObject({ prompt: 'A cobalt kingfisher on a branch' })
+  })
+
+  it('rejects a plugin prompt without the image-generation purpose', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const adapter = new PiAiAdapter({
+      profiles: () => resolveProfiles({
+        images: { api: 'openai-image-generations', baseURL: 'https://images.example/v1', models: [{ id: 'gpt-image-2' }] },
+      }),
+      resolveApiKey: () => Promise.resolve('test-key'),
+      resolveAttachments: () => ({
+        imageLimits: {
+          maxImageBytes: 4,
+          maxImagesPerMessage: 1,
+          maxMessageImageBytes: 4,
+          maxImagePixels: 4,
+          mediaTypes: ['image/png'],
+        },
+      }) as unknown as AttachmentStore,
+    })
+
+    const messages = [createUserMessage({
+      content: [{ type: 'text', text: 'Injected context must not become the prompt' }],
+      source: { kind: 'plugin', plugin: 'test' },
+    })]
+    await expect(async () => {
+      for await (const _chunk of adapter.stream({ provider: 'images', model: 'gpt-image-2', messages })) {
+        // Iterate so the generator evaluates its request validation.
+      }
+    }).rejects.toThrow('requires text in the latest user message')
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('does not reuse an earlier prompt when the latest user message has no text', async () => {
@@ -995,20 +1076,12 @@ describe('provider profile lifecycle', () => {
     expect(new LlmError('x', 'X')).toBeInstanceOf(Error)
   })
 
-  it('rejects unsupported or unresolved image input before provider I/O', async () => {
+  it('rejects unresolved image-capable input before provider I/O', async () => {
     const adapter = adapterOf({ openai: {}, deepseek: {} })
     const drain = async (options: Parameters<PiAiAdapter['stream']>[0]): Promise<void> => {
       for await (const _chunk of adapter.stream(options)) { /* drain */ }
     }
 
-    await expect(drain({
-      provider: 'deepseek',
-      model: 'deepseek-v4-flash',
-      messages: [createUserMessage({
-        content: [{ type: 'image', attachment: IMAGE_REF }],
-        source: { kind: 'plugin', plugin: 'test' },
-      })],
-    })).rejects.toMatchObject({ code: 'UNSUPPORTED_CONTENT' })
     await expect(drain({
       provider: 'openai',
       model: 'gpt-4.1',

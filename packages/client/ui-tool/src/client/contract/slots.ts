@@ -1,6 +1,7 @@
 /** Tool UI slot declarations and their composed component props. */
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 
@@ -38,6 +39,8 @@ export interface ToolCallOwnerProps {
   openFile: (path: string) => void
   /** Inspect this call in the trajectory view when available. */
   inspect?: (() => void) | undefined
+  /** Resolve a session-authorized durable image for a tool-owned result view. */
+  loadImage: (attachment: ImageAttachmentRef) => Promise<string>
 }
 
 /** Full props of a registered atomic Tool view. */

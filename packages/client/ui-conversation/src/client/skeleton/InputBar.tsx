@@ -7,7 +7,7 @@
  * (running/removed/promptError) are self-selected via useSession. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import type { ChangeEvent, CompositionEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
@@ -106,17 +106,38 @@ export function InputBar({
   const dragDepthRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const mirrorRef = useRef<HTMLDivElement | null>(null)
-  // IME guard: composition Enter picks a candidate, it must not send. The ref outlives renders;
-  // clearing is deferred one tick because Safari delivers the closing keydown AFTER compositionend.
+  // IME has two distinct states. `compositionActiveRef` owns the temporary
+  // browser edit, while `composingRef` additionally covers Safari's closing
+  // keydown after compositionend so candidate confirmation never submits.
+  const compositionActiveRef = useRef(false)
   const composingRef = useRef(false)
-  const onCompositionStart = (): void => {
+  const compositionClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [compositionDraft, setCompositionDraft] = useState<string | null>(null)
+  const displayedDraft = compositionDraft ?? draft
+  const onCompositionStart = (event: CompositionEvent<HTMLTextAreaElement>): void => {
+    if (compositionClearTimerRef.current !== null) clearTimeout(compositionClearTimerRef.current)
+    compositionClearTimerRef.current = null
+    compositionActiveRef.current = true
     composingRef.current = true
+    setCompositionDraft(event.currentTarget.value)
   }
-  const onCompositionEnd = (): void => {
-    setTimeout(() => {
+  const onCompositionEnd = (event: CompositionEvent<HTMLTextAreaElement>): void => {
+    compositionActiveRef.current = false
+    const next = event.currentTarget.value
+    setCompositionDraft(null)
+    if (keyboard !== undefined && !locked && !machineBusy) {
+      keyboard.setDraft(next)
+      keyboard.track(next, event.currentTarget.selectionStart)
+    }
+    compositionClearTimerRef.current = setTimeout(() => {
       composingRef.current = false
+      compositionClearTimerRef.current = null
     }, 10)
   }
+
+  useEffect(() => () => {
+    if (compositionClearTimerRef.current !== null) clearTimeout(compositionClearTimerRef.current)
+  }, [])
 
   // The Access seat's data: the host-computed permissions projection
   // (undefined = capability absent → the chip renders nothing).
@@ -343,6 +364,12 @@ export function InputBar({
     if (keyboard === undefined || locked) return // disabled/read-only states cannot edit the draft
     if (machineBusy) return // submitting is the read-only span; adjudicating holds the pending lock
     const next = e.target.value
+    if (compositionActiveRef.current || (e.nativeEvent as InputEvent).isComposing) {
+      compositionActiveRef.current = true
+      composingRef.current = true
+      setCompositionDraft(next)
+      return
+    }
     keyboard.setDraft(next)
     // selectionStart is number|null in lib.dom; the type-aware lint program narrows it.
     // oxlint-disable-next-line typescript/no-unnecessary-condition
@@ -565,7 +592,9 @@ export function InputBar({
   // claim token highlights through behind the textarea glyphs; each U+FFFC
   // placeholder renders as a chip (the textarea's own glyph is invisible, the
   // backdrop chip supplies the visual); the claim hint is ghost text.
-  const deco = input === undefined ? INERT_DECORATIONS : deriveDecorations(input, lexicon)
+  const deco = input === undefined || compositionDraft !== null
+    ? INERT_DECORATIONS
+    : deriveDecorations(input, lexicon)
   const backdrop: ReactNode[] = []
   {
     // Segment boundaries: the token range end, every chip offset, and every
@@ -574,13 +603,13 @@ export function InputBar({
     // claim token only leads).
     let cursor = 0
     const pushPlain = (upTo: number): void => {
-      if (upTo > cursor) backdrop.push(draft.slice(cursor, upTo))
+      if (upTo > cursor) backdrop.push(displayedDraft.slice(cursor, upTo))
       cursor = upTo
     }
     if (deco.token !== null) {
       backdrop.push(
         <mark key="token" className={css.hlToken} data-decoration="token">
-          {draft.slice(deco.token.start, deco.token.end)}
+          {displayedDraft.slice(deco.token.start, deco.token.end)}
         </mark>,
       )
       cursor = deco.token.end
@@ -618,13 +647,13 @@ export function InputBar({
         // textarea's (advance untouched); the mark paints the chip look.
         backdrop.push(
           <mark key={`ref-${b.ref.start}`} className={css.textRef} data-decoration="text-ref">
-            {draft.slice(b.ref.start, b.ref.end)}
+            {displayedDraft.slice(b.ref.start, b.ref.end)}
           </mark>,
         )
         cursor = b.ref.end
       }
     }
-    pushPlain(draft.length)
+    pushPlain(displayedDraft.length)
     if (deco.hint !== null) {
       // Claim tokens have the `/name ` format (trailing space); trim to the bare name.
       const commandName = input?.claim?.token.slice(1).trim() ?? ''
@@ -699,7 +728,7 @@ export function InputBar({
             <textarea
               ref={inputRef}
               className={css.input}
-              value={draft}
+              value={displayedDraft}
               disabled={textareaDisabled}
               readOnly={machineBusy || workspaceTrigger}
               aria-label={workspaceTrigger ? t('hero.chooseWorkspace') : undefined}
@@ -726,7 +755,7 @@ export function InputBar({
               onCompositionStart={onCompositionStart}
               onCompositionEnd={onCompositionEnd}
             />
-            <div ref={mirrorRef} aria-hidden className={css.mirror} data-input-mirror>{`${draft}\n`}</div>
+            <div ref={mirrorRef} aria-hidden className={css.mirror} data-input-mirror>{`${displayedDraft}\n`}</div>
           </div>
         </div>
         <div className={css.row}>

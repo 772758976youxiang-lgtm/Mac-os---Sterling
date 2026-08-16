@@ -594,6 +594,39 @@ describe('Enter semantics', () => {
     expect(shell.snapshot.draft).toBe('first second')
   })
 
+  it('keeps an IME draft local across external rerenders and commits it on composition end', () => {
+    const { textarea, shell, view, props } = bench()
+    fireEvent.compositionStart(textarea)
+    fireEvent.change(textarea, { target: { value: 'huan' } })
+
+    expect(shell.snapshot.draft).toBe('')
+    expect(textarea.value).toBe('huan')
+    expect(view.container.querySelector('[data-input-backdrop]')?.textContent).toBe('huan')
+
+    view.rerender(<InputBar {...props} accessory={<span>external update</span>} />)
+    expect(view.container.querySelector('textarea')).toBe(textarea)
+    expect(textarea.value).toBe('huan')
+
+    fireEvent.compositionEnd(textarea, { data: '换', target: { value: '换' } })
+    expect(shell.snapshot.draft).toBe('换')
+    expect(textarea.value).toBe('换')
+  })
+
+  it('does not let the prior IME clear timer end a new composition', () => {
+    vi.useFakeTimers()
+    try {
+      const { textarea, sink } = bench({ draft: 'hello' })
+      fireEvent.compositionStart(textarea)
+      fireEvent.compositionEnd(textarea)
+      fireEvent.compositionStart(textarea)
+      vi.advanceTimersByTime(20)
+      fireEvent.keyDown(textarea, { key: 'Enter' })
+      expect(sink).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('composition Enter never sends: ref guard, isComposing, and keyCode 229 paths', () => {
     vi.useFakeTimers()
     try {

@@ -128,6 +128,20 @@ export function numberField(field: string): CardFieldSpec {
   }
 }
 
+/** A binary field serialized as a JSON boolean in the settings namespace. */
+export function booleanField(field: string): CardFieldSpec {
+  return {
+    field,
+    format: value => typeof value === 'boolean' ? String(value) : '',
+    parse: (text) => {
+      if (text === 'true') return { kind: 'set', value: true }
+      if (text === 'false') return { kind: 'set', value: false }
+      if (text.trim() === '') return { kind: 'clear' }
+      return undefined
+    },
+  }
+}
+
 /**
  * A free-text field. An empty draft clears the field, so emptying the control
  * and saving is the same gesture as resetting it.

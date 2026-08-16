@@ -31,6 +31,7 @@
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`、`get_goal`、`update_goal` | `ctx.tools`、`ctx.agents`、`ctx.goals`、`ctx.systemPrompt`、`a calling Agent in an authorized open turn` | `tool/call`、`goal/change for mutations`、`tool/result` | - | create、edit、pause 和 resume 要求直接来自人类的根权限；complete 和 blocked 也接受确切的当前 Goal Round。blocked 的默认下限是 3 个获准的 Round。 |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`、`schedule_delete`、`schedule_list` | `ctx.tools`、`ctx.sessions`、Session 持久化、未来创建的 live 根 Agent | `tool/call`、`schedule/change create or delete`、`tool/result` | - | 仅在选择启用的 Schedule 插件加载后创建的 live 根 Agent scope 内注册。版本 1 接受 after_seconds、显式绝对 at 和有界固定速率 every_seconds，并披露 session-local 交付；管理读取与变更必须通过共享的 Session 持久化 barrier。 |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`、`ctx.lsp`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。 |
+| `@deepseek-ai/dsh-mcp-image-generation` | `mcp__image__generate_image`、`mcp__vision__analyze_image` | `ctx.tools`、`ctx.llm`、`ctx.attachments`、`ctx.settings` | `tool/call`、持久图片附件、`tool/result` | - | MCP 形态的名称保持稳定，使文本模型无需接触凭据即可调用已配置的图片路由。图片字节保留为持久附件；只有简短的完成摘要会进入模型上下文。 |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`、`ctx.workflowEngine`、`ctx.subagents`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents every fresh round)` | `tool/call`、`tool/result`、`workflow and child session events during execution` | - | 固定的前台工作流会在每个 Round 启动一个全新的结构化子级；模型只能选择不可变目标和可选的 Round 上限。 |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`、`ctx.agents`、`ctx.skills` | `tool/call`、`tool/result`、`user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 5 个只读工具会隐藏提供方游标，并根据不可变的调用 agent 会话为每个结果授权。该包需要选择启用；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
@@ -1180,6 +1181,122 @@ create、edit、pause 和 resume 要求直接来自人类的根权限；complete
 来源：[`packages/lsp/tool-lsp/src/index.ts`](../packages/lsp/tool-lsp/src/index.ts)
 
 lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。
+
+<a id="deepseek-aidsh-mcp-image-generation"></a>
+
+## `@deepseek-ai/dsh-mcp-image-generation`
+
+### `mcp__image__generate_image`
+
+创建新图片，或直接编辑、转换最新人类消息所附的图片。所有生图请求都直接调用此工具：附加原图会原样转发给生图模型，因此不要先调用视觉工具、检查附件 ID 或搜索文件。根据构图明确选择尺寸和质量：多视图设定图或宽场景使用横向尺寸，高挑单主体布局使用纵向尺寸，其他情况使用方形尺寸。编辑图片时只描述所需变化和必须保留的内容，不要猜测或复述视觉细节。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "For a new image, describe the desired result. For an edit, describe the change and the source details that must remain unchanged."
+    },
+    "size": {
+      "type": "string",
+      "description": "Output dimensions: 1024x1024 is square (1:1), 1536x1024 is landscape (3:2) for multi-view or wide layouts, 1024x1536 is portrait (2:3), and auto lets the provider choose.",
+      "enum": [
+        "1024x1024",
+        "1536x1024",
+        "1024x1536",
+        "auto"
+      ]
+    },
+    "quality": {
+      "type": "string",
+      "description": "Image quality tier. Use high unless the user prioritizes speed or lower cost.",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "auto"
+      ]
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of separate output images, not the number of views within one image. Usually omit this to use the route's configured count (one by default)."
+    }
+  },
+  "required": [
+    "prompt",
+    "size",
+    "quality"
+  ]
+}
+```
+
+来源：[`packages/mcp/mcp-image-generation/src/index.ts`](../packages/mcp/mcp-image-generation/src/index.ts)
+
+<a id="deepseek-aidsh-mcp-image-generation-mcp-vision-analyze-image"></a>
+
+### `mcp__vision__analyze_image`
+
+使用 Qwen3.7-Flash 返回最新人类消息所附图片的文字理解结果。仅用于描述、OCR、比较、提取或视觉问题。不要把它作为生图或图片编辑的预处理；`mcp__image__generate_image` 会直接接收原图。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "What to inspect or extract from the image."
+    },
+    "images": {
+      "type": "array",
+      "description": "Optional explicit durable image references. Usually omit this and the latest human image is selected automatically.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "attachmentId": {
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp",
+              "image/gif",
+              "image/avif",
+              "image/heif"
+            ]
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attachmentId",
+          "mediaType",
+          "bytes",
+          "width",
+          "height"
+        ]
+      }
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+来源：[`packages/mcp/mcp-image-generation/src/index.ts`](../packages/mcp/mcp-image-generation/src/index.ts)
+
+MCP 形态的名称保持稳定，使文本模型无需接触凭据即可调用已配置的图片路由。图片字节保留为持久附件；只有简短的完成摘要会进入模型上下文。
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 

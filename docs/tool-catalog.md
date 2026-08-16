@@ -29,6 +29,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`, `schedule_delete`, `schedule_list` | `ctx.tools`, `ctx.sessions`, `Session persistence`, `a future live root Agent` | `tool/call`, `schedule/change create or delete`, `tool/result` | - | Registered only inside live root Agent scopes created after the opt-in Schedule plugin loads. Version 1 accepts after_seconds, explicit absolute at, and bounded fixed-rate every_seconds, and discloses session-local delivery; management reads and mutations require the shared Session persistence barrier. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
+| `@deepseek-ai/dsh-mcp-image-generation` | `mcp__image__generate_image`, `mcp__vision__analyze_image` | `ctx.tools`, `ctx.llm`, `ctx.attachments`, `ctx.settings` | `tool/call`, `durable image attachments`, `tool/result` | - | The MCP-shaped name is stable so text models can call the configured image route without receiving its credentials. Image bytes remain durable attachments; only the compact completion summary enters model context. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
@@ -1176,6 +1177,120 @@ Query a language server for precise code navigation. operation is one of goToDef
 Source: [`packages/lsp/tool-lsp/src/index.ts`](../packages/lsp/tool-lsp/src/index.ts)
 
 The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.
+
+<a id="deepseek-aidsh-mcp-image-generation"></a>
+
+## `@deepseek-ai/dsh-mcp-image-generation`
+
+### `mcp__image__generate_image`
+
+Create a new image or directly edit/transform images attached to the latest human message. For every image-generation request, call this tool directly: attached source images are forwarded unchanged to the image model, so do not call vision first, inspect attachment ids, or search files. Choose size and quality explicitly for the requested composition: use landscape for multi-view sheets or wide scenes, portrait for tall single-subject layouts, and square otherwise. For edits, describe the requested transformation and what must stay unchanged instead of guessing or restating visual details.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "For a new image, describe the desired result. For an edit, describe the change and the source details that must remain unchanged."
+    },
+    "size": {
+      "type": "string",
+      "description": "Output dimensions: 1024x1024 is square (1:1), 1536x1024 is landscape (3:2) for multi-view or wide layouts, 1024x1536 is portrait (2:3), and auto lets the provider choose.",
+      "enum": [
+        "1024x1024",
+        "1536x1024",
+        "1024x1536",
+        "auto"
+      ]
+    },
+    "quality": {
+      "type": "string",
+      "description": "Image quality tier. Use high unless the user prioritizes speed or lower cost.",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "auto"
+      ]
+    },
+    "count": {
+      "type": "integer",
+      "description": "Number of separate output images, not the number of views within one image. Usually omit this to use the route's configured count (one by default)."
+    }
+  },
+  "required": [
+    "prompt",
+    "size",
+    "quality"
+  ]
+}
+```
+
+Source: [`packages/mcp/mcp-image-generation/src/index.ts`](../packages/mcp/mcp-image-generation/src/index.ts)
+
+### `mcp__vision__analyze_image`
+
+Return textual understanding of images attached to the latest human message with Qwen3.7-Flash. Use only for description, OCR, comparison, extraction, or visual questions. Do not use this as preparation for image generation or editing; mcp__image__generate_image receives source images directly.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "What to inspect or extract from the image."
+    },
+    "images": {
+      "type": "array",
+      "description": "Optional explicit durable image references. Usually omit this and the latest human image is selected automatically.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "attachmentId": {
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp",
+              "image/gif",
+              "image/avif",
+              "image/heif"
+            ]
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "attachmentId",
+          "mediaType",
+          "bytes",
+          "width",
+          "height"
+        ]
+      }
+    }
+  },
+  "required": [
+    "prompt"
+  ]
+}
+```
+
+Source: [`packages/mcp/mcp-image-generation/src/index.ts`](../packages/mcp/mcp-image-generation/src/index.ts)
+
+The MCP-shaped name is stable so text models can call the configured image route without receiving its credentials. Image bytes remain durable attachments; only the compact completion summary enters model context.
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 

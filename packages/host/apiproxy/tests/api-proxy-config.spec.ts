@@ -353,12 +353,19 @@ describe('settings domain', () => {
     ctx.settings.register(settingsNamespace('web-search-deepseek'), z.object({
       baseURL: z.string(),
     }))
+    ctx.settings.register(settingsNamespace('email-digest'), z.object({
+      enabled: z.boolean().default(false),
+    }))
+    ctx.settings.register(settingsNamespace('mcp-image-generation'), z.object({
+      visionApiKeyEnv: z.string().default('DASHSCOPE_API_KEY'),
+      visionModel: z.string().default('qwen3.7-flash'),
+    }))
     const api = createApiProxy(ctx, DEFAULTS)
 
     const value = expectOk(await api.settings.describe(request({})))
     expect(value.namespaces.map(view => view.ns)).toEqual([
       'llm-deepseek', 'permission', 'ui-theme', 'locale', 'ui-conversation',
-      'shell', 'agent-loop', 'web-search-deepseek',
+      'shell', 'agent-loop', 'web-search-deepseek', 'email-digest', 'mcp-image-generation',
     ])
     const permission = expectOk(await api.settings.mutate(request({
       ns: 'permission',
@@ -395,6 +402,11 @@ describe('settings domain', () => {
       ops: [{ op: 'set', path: ['baseURL'], value: 'https://search.test/v1' }],
     })))
     expect(webSearch.value).toEqual({ baseURL: 'https://search.test/v1' })
+    const vision = expectOk(await api.settings.mutate(request({
+      ns: 'mcp-image-generation',
+      ops: [{ op: 'set', path: ['visionApiKeyEnv'], value: 'QWEN_API_KEY' }],
+    })))
+    expect(vision.value).toEqual({ visionApiKeyEnv: 'QWEN_API_KEY', visionModel: 'qwen3.7-flash' })
 
     for (const response of [
       await api.settings.update(request({ ns: 'some-other-plugin', patch: { secretPath: '/etc/shadow' } })),

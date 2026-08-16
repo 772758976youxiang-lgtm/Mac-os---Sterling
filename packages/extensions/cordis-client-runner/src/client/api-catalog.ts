@@ -415,7 +415,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AssistantBlock',
-    declaration: 'export type AssistantBlock = {\n    kind: \'text\';\n    text: string;\n} | {\n    kind: \'reasoning\';\n    text: string;\n} | {\n    kind: \'image\';\n    attachment: ImageAttachmentRef;\n} | {\n    kind: \'tool-call\';\n    callId: string;\n    name: string;\n    argsRaw: string;\n} | {\n    kind: \'other\';\n    block: unknown;\n};',
+    declaration: 'export type AssistantBlock = {\n    kind: \'text\';\n    text: string;\n} | {\n    kind: \'reasoning\';\n    text: string;\n} | {\n    kind: \'image-pending\';\n} | {\n    kind: \'image\';\n    attachment: ImageAttachmentRef;\n} | {\n    kind: \'tool-call\';\n    callId: string;\n    name: string;\n    argsRaw: string;\n} | {\n    kind: \'other\';\n    block: unknown;\n};',
   },
   {
     name: 'AssistantMessageNode',

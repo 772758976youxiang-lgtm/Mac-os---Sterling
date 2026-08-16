@@ -465,6 +465,18 @@ interface LlmResolvedModelInfo extends LlmModelInfo {
 ```
 
 ```ts type-equiv
+/** Provider-neutral controls for one auxiliary image-generation request. */
+interface ImageGenerationRequestOptions {
+  /** Requested output dimensions, including the provider's automatic choice. */
+  size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto'
+  /** Requested image quality tier. */
+  quality?: 'low' | 'medium' | 'high' | 'auto'
+  /** Number of separate images requested from the provider. */
+  n?: number
+}
+```
+
+```ts type-equiv
 /** A single model request, fully assembled. */
 interface GenerateOptions {
   /** Registered provider route selecting the adapter instance. */
@@ -482,6 +494,8 @@ interface GenerateOptions {
   system?: string
   /** Tool schemas (adapters map to the provider's `tools` field). */
   tools?: ToolSchema[]
+  /** Per-request controls used only by image-generation adapters. */
+  imageGeneration?: ImageGenerationRequestOptions
   temperature?: number
   maxTokens?: number
   /**
@@ -501,7 +515,7 @@ interface GenerateOptions {
    * map the purpose to model-hidden transport metadata or purpose-specific
    * generation policy. Ordinary conversation requests leave it unset.
    */
-  purpose?: 'compaction' | 'session-title'
+  purpose?: 'compaction' | 'image-generation' | 'session-title'
 }
 ```
 

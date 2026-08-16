@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { useSyncExternalStore } from 'react'
+import type * as React from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createCanvasStore } from '../src/client/stores.ts'
@@ -15,8 +16,10 @@ const copy: Record<string, string> = {
 
 function renderMenu(align?: 'start' | 'end'): ReturnType<typeof render> {
   const instance = createCanvasStore().create()
-  function Harness(): JSX.Element {
-    const snapshot = useSyncExternalStore(instance.subscribe, instance.getSnapshot, instance.getSnapshot)
+  function Harness(): React.JSX.Element {
+    const subscribe = (listener: () => void): (() => void) => instance.subscribe(listener)
+    const getSnapshot = (): ReturnType<typeof instance.getSnapshot> => instance.getSnapshot()
+    const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
     const props = {
       wide: true,
       align,

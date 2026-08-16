@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-当前 Cordis Loader 树的只读 Host 投影。`PluginInventoryGateway` 注册 `pluginInventory` 服务，并发布一个由 Typert 生成的直接 Remote：`pluginInventory/list`。每次调用都直接读取 `ctx.loader.entries()`，跳过结构性的 group 行，再按 Loader 顺序返回其余条目，并且只包含 Loader 条目 id、模块标识、有效启用状态与当前根 Fiber 阶段。
+当前 Cordis Loader 树的只读 Host 投影。`PluginInventoryGateway` 注册 `pluginInventory` 服务，并发布由 Typert 生成的直接 Remote：`pluginInventory/list` 与 `pluginInventory/mcp`。每次调用都直接读取当前来源。`list` 跳过结构性的 group 行，再按 Loader 顺序返回其余条目，并且只包含 Loader 条目 id、模块标识、有效启用状态与当前根 Fiber 阶段。`mcp` 选择已配置的 `@deepseek-ai/dsh-mcp-client` 条目，并与当前注册的 `mcp__<serverName>__*` 工具 schema 合并，只公开服务命名空间、安全的传输类型、生命周期以及已发现的工具名称和描述。
 
 阶段为 `pending`、`loading`、`active`、`failed` 或 `unloading`；条目没有存活的根 Fiber 时则为 `null`。该快照刻意只表示调用当下：Loader 仍是唯一的生命周期权威，本包不拥有缓存、历史、来源模型、事件流或修改路径。公开 payload 类型位于 `./types`，Typert 生成由 `./typert` 与 `./remote` 导出的 Host 和 Client Remote 产物。
 
@@ -19,4 +19,5 @@
 ## 已知限制与暂缓事项
 
 - **仅表示调用当下** —— 结果不包含持久的失败历史或订阅；只要不存在存活的根 Fiber，就会报告 `null`，而不区分其原因。
-- **无来源与修改能力** —— 服务不识别条目由哪个 bundle、profile 或 override 引入，也不能启用、停用、添加或移除插件。
+- **无来源与修改能力** —— 服务不识别条目由哪个 bundle、profile 或 override 引入，也不能启用、停用、添加或移除插件或 MCP 服务。
+- **MCP 详情刻意保持最小化** —— 接口 URL、命令、请求头、环境变量与重连状态不会离开 Host；该投影仅列出当前在工具运行时中注册的能力。

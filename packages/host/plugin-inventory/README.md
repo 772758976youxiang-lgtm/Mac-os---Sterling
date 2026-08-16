@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Read-only Host projection of the current Cordis Loader tree. `PluginInventoryGateway` registers the `pluginInventory` service and publishes one generated direct Remote, `pluginInventory/list`. Every call reads `ctx.loader.entries()` directly, skips structural group rows, and returns the remaining entries in Loader order with only their Loader entry id, module specifier, effective enablement, and current root Fiber phase.
+Read-only Host projection of the current Cordis Loader tree. `PluginInventoryGateway` registers the `pluginInventory` service and publishes generated direct Remotes, `pluginInventory/list` and `pluginInventory/mcp`. Every call reads its current source directly. `list` skips structural group rows and returns the remaining entries in Loader order with only their Loader entry id, module specifier, effective enablement, and current root Fiber phase. `mcp` selects configured `@deepseek-ai/dsh-mcp-client` entries and joins them with the currently registered `mcp__<serverName>__*` tool schemas, exposing server namespace, safe transport kind, lifecycle, and discovered tool names and descriptions only.
 
 The phase is `pending`, `loading`, `active`, `failed`, or `unloading`; it is `null` when the entry has no live root Fiber. The snapshot is intentionally point-in-time: Loader remains the sole lifecycle authority, while this package owns no cache, history, provenance model, event stream, or mutation path. Its public payload types live under `./types`, and Typert generates the Host and Client Remote artifacts exposed by `./typert` and `./remote`.
 
@@ -19,4 +19,5 @@ None; this package never assembles model input.
 ## Known Limitations and Deferred Work
 
 - **Point-in-time state only** — the result contains no durable failure history or subscription; a missing root Fiber is reported as `null`, regardless of why no live root exists.
-- **No provenance or mutation** — the service does not identify which bundle, profile, or override introduced an entry, and it cannot enable, disable, add, or remove plugins.
+- **No provenance or mutation** — the service does not identify which bundle, profile, or override introduced an entry, and it cannot enable, disable, add, or remove plugins or MCP servers.
+- **MCP details are deliberately minimal** — endpoint URLs, commands, headers, environment values, and reconnect state do not leave the Host; the projection lists only capabilities currently registered in the tool runtime.

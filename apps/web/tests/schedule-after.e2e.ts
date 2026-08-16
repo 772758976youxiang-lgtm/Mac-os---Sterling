@@ -28,7 +28,6 @@ import {
 import { connectFreshWorkspace, conversationContextKey, saveFailureShot } from './support.ts'
 
 const MODE = webSnapshotMode()
-const OVERLAY = fileURLToPath(new URL('../../../examples/web-schedule/cordis.yml', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/schedule-after', import.meta.url))
 const AFTER_EXPECTED = join(SNAPSHOT_DIR, 'conversation.expected.md')
 const AT_EXPECTED = join(SNAPSHOT_DIR, 'at-conversation.expected.md')
@@ -213,7 +212,7 @@ describe.skipIf(MODE === 'record')('web e2e: conversational reminders', () => {
   const everyAdapter = new EveryReminderAdapter()
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({ extraOverlayPath: OVERLAY })
+    scaffold = await launchWebScaffold()
     scaffold.ctx.effect(
       () => scaffold.ctx.llm.registerAdapter([AFTER_PROVIDER], afterAdapter),
       'Schedule Web After adapter',

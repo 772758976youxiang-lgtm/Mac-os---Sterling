@@ -2,7 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
-  CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR, apply,
+  CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR, DEFAULT_SHOW_CONTEXT_INJECTIONS, apply,
 } from '@deepseek-ai/dsh-client-ui-conversation'
 
 class MemorySettings extends SettingsProvider {
@@ -20,9 +20,14 @@ describe('ui-conversation host', () => {
     const fiber = ctx.plugin({ apply })
     await fiber.await()
     const ns = settingsNamespace(CONVERSATION_SETTINGS_NAMESPACE)
-    expect(ctx.settings.get(ns)).toEqual({ busyEnter: DEFAULT_BUSY_ENTER_BEHAVIOR })
+    expect(ctx.settings.get(ns)).toEqual({
+      busyEnter: DEFAULT_BUSY_ENTER_BEHAVIOR,
+      showContextInjections: DEFAULT_SHOW_CONTEXT_INJECTIONS,
+    })
     await ctx.settings.update(ns, { busyEnter: 'steer' })
-    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer' })
+    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer', showContextInjections: true })
+    await ctx.settings.update(ns, { showContextInjections: false })
+    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer', showContextInjections: false })
     await expect(ctx.settings.update(ns, { busyEnter: 'invalid' })).rejects.toThrow()
     await fiber.dispose()
     expect(ctx.settings.describe().map(row => row.ns)).not.toContain(ns)

@@ -17,6 +17,14 @@
 
 [会话持久化决策](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md)记录了持久化设计。
 
+## 邮件日报
+
+已完成 Session-local Schedule 提醒的可选 SMTP 投递。
+
+| 包 | 职责 |
+|---|---|
+| [`email-digest/`](email-digest/README.md) | 将已完成的 Schedule follow-up 收集为持久 Session 事件，并为 live 根 Session 发送每日 SMTP 日报。 |
+
 ## 投影
 
 向客户端载体提供从日志派生的当前逐会话状态。

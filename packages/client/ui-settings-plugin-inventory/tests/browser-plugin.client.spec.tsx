@@ -5,8 +5,9 @@ import { cleanup } from '@testing-library/react'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
-import { usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
+import { stubSettingsScope, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject, NS } from '../src/client/index.ts'
+import { McpManagementSettingsTab } from '../src/client/McpManagementSettingsTab.tsx'
 import { PluginInventorySettingsTab } from '../src/client/PluginInventorySettingsTab.tsx'
 import type { PluginInventorySettingsTabInjected } from '../src/client/PluginInventorySettingsTab.tsx'
 
@@ -14,6 +15,7 @@ usePinnedBrowserLanguages('zh-CN')
 afterEach(cleanup)
 
 const EMPTY = { entries: [] }
+const EMPTY_MCP = { servers: [] }
 type ListResult =
   | { readonly ok: true; readonly value: typeof EMPTY }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
@@ -29,10 +31,13 @@ async function bench() {
     }
   }
   new RemoteService(ctx)
+  ctx.provide('connection', { api: {}, isLoopback: true } as never)
+  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
   const list = vi.fn<() => Promise<ListResult>>()
     .mockResolvedValue({ ok: true, value: EMPTY })
-  ctx.provide('remote.pluginInventory', { list })
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list }
+  const mcp = vi.fn().mockResolvedValue({ ok: true, value: EMPTY_MCP })
+  ctx.provide('remote.pluginInventory', { list, mcp })
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, mcp }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -44,7 +49,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-plugin-inventory browser plugin', () => {
   it('declares only the services used by the Settings Remote contribution', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory'])
+    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.pluginInventory', 'settingsScope'])
   })
 
   it('registers a localized tab without reading the Remote eagerly', async () => {
@@ -52,7 +57,7 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
 
-    const entry = b.slots.entries('settings.plugins.tab')[0]!
+    const entry = b.slots.entries('settings.plugins.tab').find(candidate => candidate.options.id === 'all')!
     expect(entry.component).toBe(PluginInventorySettingsTab)
     expect(entry.options).toMatchObject({ id: 'all', order: 10 })
     expect(entry.locale).toBe(NS)
@@ -64,6 +69,11 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     expect(b.list).toHaveBeenCalledOnce()
     b.list.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
     await expect(injected.list()).rejects.toThrow('pluginInventory.list failed: REMOTE_ERROR: unavailable')
+    const mcpEntry = b.slots.entries('settings.plugins.tab').find(candidate => candidate.options.id === 'mcp')!
+    expect(mcpEntry.component).toBe(McpManagementSettingsTab)
+    expect(mcpEntry.options).toMatchObject({ id: 'mcp', order: 5 })
+    expect(resolveSlotLabel(mcpEntry.options.label)).toBe('MCP 管理')
+    expect(b.mcp).not.toHaveBeenCalled()
     await b.ctx.fiber.dispose()
   })
 
@@ -74,15 +84,15 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     expect(b.slots.entries('settings.plugins.tab')).toHaveLength(0)
 
     const stop = declare(b.slots)
-    await vi.waitFor(() => { expect(b.slots.entries('settings.plugins.tab')).toHaveLength(1) })
+    await vi.waitFor(() => { expect(b.slots.entries('settings.plugins.tab')).toHaveLength(2) })
     b.locale.setLocale('en')
-    expect(resolveSlotLabel(b.slots.entries('settings.plugins.tab')[0]!.options.label)).toBe('Plugin list')
+    expect(resolveSlotLabel(b.slots.entries('settings.plugins.tab').find(entry => entry.options.id === 'all')!.options.label)).toBe('Plugin list')
 
     stop()
     expect(b.slots.entries('settings.plugins.tab')).toHaveLength(0)
     declare(b.slots)
     await vi.waitFor(() => {
-      expect(b.slots.entries('settings.plugins.tab')[0]?.component).toBe(PluginInventorySettingsTab)
+      expect(b.slots.entries('settings.plugins.tab').some(entry => entry.component === PluginInventorySettingsTab)).toBe(true)
     })
 
     await fiber.dispose()

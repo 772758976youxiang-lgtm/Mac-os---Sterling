@@ -26,3 +26,32 @@ export interface PluginInventoryEntry {
 export interface PluginInventorySnapshot {
   readonly entries: readonly PluginInventoryEntry[]
 }
+
+/** One currently discovered MCP tool, projected from the global tool registry. */
+export interface McpToolInventoryEntry {
+  /** Public tool name available to the agent. */
+  readonly name: string
+  /** Server-provided summary, when the MCP server advertised one. */
+  readonly description: string
+}
+
+/** One configured MCP client and the tools it currently contributes. */
+export interface McpServerInventoryEntry {
+  /** Loader-tree identity of the MCP client instance. */
+  readonly entryId: PluginEntryId
+  /** MCP namespace used in every public tool name. */
+  readonly serverName: string
+  /** Transport selected by the configured client instance, if readable. */
+  readonly transport: 'stdio' | 'streamable-http' | 'local' | null
+  /** Effective Loader enablement, including disabled ancestor groups. */
+  readonly enabled: boolean
+  /** Current root Fiber phase, or null when no live instance exists. */
+  readonly fiberPhase: PluginFiberPhase
+  /** Tools discovered from this server and available in the global registry. */
+  readonly tools: readonly McpToolInventoryEntry[]
+}
+
+/** Point-in-time MCP server and capability inventory returned to trusted clients. */
+export interface McpInventorySnapshot {
+  readonly servers: readonly McpServerInventoryEntry[]
+}

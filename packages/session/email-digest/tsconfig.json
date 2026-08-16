@@ -1,0 +1,17 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../core/agent" },
+    { "path": "../../credentials/credentials" },
+    { "path": "../../core/session" },
+    { "path": "../../session/session-persistence" },
+    { "path": "../../runtime-diagnostics/invariants" },
+    { "path": "../../settings/settings" }
+  ]
+}

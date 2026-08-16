@@ -73,6 +73,12 @@ describe('OpenAI image generations', () => {
 
     await expect(generateOpenAIImages(request({
       headers: { 'x-team': 'harness', 'content-type': 'application/json' },
+      config: {
+        ...DEFAULT_OPENAI_IMAGE_GENERATION,
+        size: '1536x1024',
+        quality: 'medium',
+        n: 2,
+      },
       images: [
         { data: Uint8Array.of(4, 5), mediaType: 'image/png' },
         { data: Uint8Array.of(6), mediaType: 'image/jpeg' },
@@ -87,6 +93,10 @@ describe('OpenAI image generations', () => {
     const body = init.body as FormData
     expect(body.get('model')).toBe('gpt-image-2')
     expect(body.get('prompt')).toBe('A lighthouse at dusk')
+    expect(body.get('size')).toBe('1536x1024')
+    expect(body.get('quality')).toBe('medium')
+    expect(body.get('n')).toBe('2')
+    expect(body.get('response_format')).toBe('b64_json')
     expect(body.getAll('image[]').map(file => file instanceof File ? {
       name: file.name, type: file.type,
     } : file)).toEqual([

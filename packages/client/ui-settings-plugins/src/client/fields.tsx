@@ -121,3 +121,26 @@ export function SecretField(props: Pick<FieldProps, 'id' | 'label' | 'hint' | 't
     </div>
   )
 }
+
+/** A compact binary setting rendered as an accessible switch. */
+export function ToggleField(props: Pick<FieldProps, 'id' | 'label' | 'hint' | 'disabled' | 'onEdit'> & {
+  checked: boolean
+}) {
+  return (
+    <div className={css.toggleField}>
+      <div>
+        <label className={css.label} htmlFor={props.id}>{props.label}</label>
+        <p className={css.hint}>{props.hint}</p>
+      </div>
+      <input
+        id={props.id}
+        className={css.toggle}
+        type="checkbox"
+        role="switch"
+        checked={props.checked}
+        disabled={props.disabled}
+        onChange={(event) => { props.onEdit(String(event.target.checked)) }}
+      />
+    </div>
+  )
+}

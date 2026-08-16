@@ -115,7 +115,7 @@ const DEFAULT_MAX_MESSAGES = 50
 
 /**
  * Non-model settings namespaces intentionally served to the Web client. The
- * plugin-owned entries (`agent-loop`, `bash`, `web-search-deepseek`) are the
+ * plugin-owned entries (`agent-loop`, `bash`, `web-search-deepseek`, `email-digest`) are the
  * host-plane sections the plugin configuration page edits; a namespace absent
  * here answers `settings-not-exposed` even when its owner registered it, so
  * adding a section to that page is a decision made here rather than by the
@@ -124,7 +124,7 @@ const DEFAULT_MAX_MESSAGES = 50
  * is deferred work.
  */
 const WEB_SETTINGS_NAMESPACES = [
-  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek',
+  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek', 'email-digest',
 ] as const
 
 /** Provider work budget: at most 100 calls and 2,000 inspected hits. */
@@ -205,13 +205,36 @@ function imageBlockIn(content: unknown, match: (ref: ImageAttachmentRef) => bool
   return undefined
 }
 
-/** Search every durable event carrier that can own model-visible content. */
+/** Search the bounded image-reference shape persisted by tool presentation metadata. */
+function imageInPresentationMeta(meta: unknown, match: (ref: ImageAttachmentRef) => boolean): ImageAttachmentRef | undefined {
+  if (typeof meta !== 'object' || meta === null || Array.isArray(meta)) return undefined
+  const images = (meta as { images?: unknown }).images
+  if (!Array.isArray(images)) return undefined
+  for (const image of images) {
+    if (typeof image !== 'object' || image === null || Array.isArray(image)) continue
+    const value = image as Record<string, unknown>
+    if (typeof value.attachmentId !== 'string' || value.attachmentId.length === 0
+      || (value.mediaType !== 'image/png' && value.mediaType !== 'image/jpeg'
+        && value.mediaType !== 'image/webp' && value.mediaType !== 'image/gif'
+        && value.mediaType !== 'image/avif' && value.mediaType !== 'image/heif')
+      || typeof value.bytes !== 'number' || !Number.isSafeInteger(value.bytes) || value.bytes <= 0
+      || typeof value.width !== 'number' || !Number.isSafeInteger(value.width) || value.width <= 0
+      || typeof value.height !== 'number' || !Number.isSafeInteger(value.height) || value.height <= 0
+      || (value.name !== undefined && typeof value.name !== 'string')) continue
+    const ref = value as unknown as ImageAttachmentRef
+    if (match(ref)) return ref
+  }
+  return undefined
+}
+
+/** Search every durable event carrier that can own model-visible or presentation content. */
 function imageInEvent(event: SessionEvent, match: (ref: ImageAttachmentRef) => boolean): ImageAttachmentRef | undefined {
   const data = event.data as {
     content?: unknown
     message?: { content?: unknown }
     inserted?: Array<{ content?: unknown }>
     chunk?: { type?: unknown; block?: unknown }
+    meta?: unknown
   }
   const direct = imageBlockIn(data.content, match)
   if (direct !== undefined) return direct
@@ -228,6 +251,7 @@ function imageInEvent(event: SessionEvent, match: (ref: ImageAttachmentRef) => b
   if (event.type === 'assistant/chunk' && data.chunk?.type === 'block-end') {
     return imageBlockIn([data.chunk.block], match)
   }
+  if (event.type === 'tool/result') return imageInPresentationMeta(data.meta, match)
   return undefined
 }
 
@@ -248,7 +272,12 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
  * that choice write it through `settings.update`, so it has to cross the
  * configuration boundary or the pickers silently fail to persist.
  */
-const PRODUCT_SETTINGS_NAMESPACES = new Set(['ui-onboarding', AGENT_PRESET_SETTINGS_NAMESPACE])
+const PRODUCT_SETTINGS_NAMESPACES = new Set([
+  'ui-onboarding',
+  AGENT_PRESET_SETTINGS_NAMESPACE,
+  // The local image MCP owns the Qwen vision model and its credential reference.
+  'mcp-image-generation',
+])
 
 /** Strict browser-zone profile: UTC or an IANA Area/Location-style identifier. */
 const IANA_TIME_ZONE = /^[A-Za-z][A-Za-z0-9_+.-]*(?:\/[A-Za-z0-9_+.-]+)+$/
@@ -644,7 +673,10 @@ export interface ApiProxyDefaults {
    * and undoing it because storage failed would be the worse outcome.
    */
   saveDefaultModelSelection?: (selection: ModelSelection) => Promise<void>
-  /** Image-capable route used for one turn when the selected model is text-only. */
+  /**
+   * Legacy option accepted for callers compiled against older releases.
+   * @deprecated Image turns never change the session's selected model.
+   */
   imageFallback?: ModelSelection
   /** Default project directory for new sessions whose create request carries no cwd. */
   cwd: string
@@ -1134,42 +1166,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     const result = (imageAdmissionChains.get(agent) ?? Promise.resolve()).then(operation)
     imageAdmissionChains.set(agent, result.then(() => undefined, () => undefined))
     return result
-  }
-
-  /** Resolve the configured vision route and require its declared image capability. */
-  async function resolveImageFallback(): Promise<ModelSelection | undefined> {
-    if (defaults.imageFallback === undefined) return undefined
-    const resolved = await ctx.llm.resolveCallConfig(defaults.imageFallback)
-    const info = await ctx.llm.resolveModelInfo(resolved.provider, resolved.model)
-    if (info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
-      throw new Error(`configured image fallback model "${resolved.model}" does not accept image input`)
-    }
-    return {
-      provider: resolved.provider,
-      model: resolved.model,
-      ...resolved.reasoningEffort === undefined ? {} : { reasoningEffort: resolved.reasoningEffort },
-    }
-  }
-
-  /** Restore the original selection only after the vision turn has reached idle. */
-  function useImageFallback(agent: Agent, previous: ModelSelection, fallback: ModelSelection): () => void {
-    const selection = selectionFor(agent)
-    let restored = false
-    const restore = (): void => {
-      if (restored) return
-      restored = true
-      dispose()
-      const active = selection.current
-      if (active.provider === fallback.provider && active.model === fallback.model
-        && active.reasoningEffort === fallback.reasoningEffort) {
-        selection.current = previous
-      }
-    }
-    const dispose = ctx.on('agent/status', ({ agent: subject, status }) => {
-      if (subject === agent && status === 'idle') restore()
-    })
-    selection.current = fallback
-    return restore
   }
 
   /**
@@ -2503,34 +2499,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const hasImage = content.some(part => part.type === 'image')
         const admit = async (): Promise<RpcResponse<{ accepted: true }>> => {
           try {
-            let fallback: ModelSelection | undefined
-            let selected: ModelSelection | undefined
-            if (hasImage) {
-              selected = selectionFor(agent).current
-              const modelInfo = await ctx.llm.resolveModelInfo(selected.provider, selected.model)
-              if (modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')) {
-                fallback = await resolveImageFallback()
-                if (fallback === undefined) {
-                  return err(request, {
-                    code: 'attachment-error',
-                    message: `Model "${selected.model}" does not support image input.`,
-                    details: { reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES' },
-                  })
-                }
-              }
-            }
             const durable = await durablePromptContent(ctx, content)
             const message: UserMessage = createUserMessage({ content: durable, source })
-            const restore = fallback === undefined || selected === undefined
-              ? undefined
-              : useImageFallback(agent, selected, fallback)
-            try {
-              if (mode === 'steer') agent.steer(message)
-              else agent.followup(message)
-            } catch (error: unknown) {
-              restore?.()
-              throw error
-            }
+            if (mode === 'steer') agent.steer(message)
+            else agent.followup(message)
           } catch (error: unknown) {
             if (error instanceof AttachmentError) {
               return err(request, {

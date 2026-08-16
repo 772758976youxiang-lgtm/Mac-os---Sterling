@@ -45,6 +45,33 @@
 # `dsh.client` rows are the browser roster the modules node half scans into
 # window.__DSH_BOOT__; the modules row is simultaneously a host row.
 - insert:
+    # Session-local reminders need to observe every newly-created root agent.
+    # Keep the owner on the Web host plane rather than inside an agent preset.
+    - id: time-context
+      name: '@deepseek-ai/dsh-time-context'
+
+    - id: schedule
+      name: '@deepseek-ai/dsh-schedule'
+
+    # The digest is available in Web settings but starts disabled until its
+    # mailbox and credential are filled in through the Plugins page.
+    - id: email-digest
+      name: '@deepseek-ai/dsh-email-digest'
+      config:
+        enabled: false
+        smtp:
+          host: smtp.qq.com
+          port: 465
+          secure: true
+          username: disabled@example.com
+          passwordRef: DSH_EMAIL_SMTP_PASSWORD
+        recipients: [disabled@example.com]
+        sendAt: '18:00'
+        timeZone: Asia/Shanghai
+        from: disabled@example.com
+        subject: DeepSeek Harness daily digest
+        retryMinutes: 15
+
     - id: code-runtime
       name: '@deepseek-ai/dsh-code-runtime-worker-thread'
 
@@ -93,6 +120,11 @@
     # Read-only projection of current Loader entries for trusted client RPCs.
     - id: plugin-inventory
       name: '@deepseek-ai/dsh-host-plugin-inventory'
+
+    # A local MCP-shaped bridge over the configured image route. Text models
+    # call this tool while credentials and returned image bytes stay in-host.
+    - id: mcp-image-generation
+      name: '@deepseek-ai/dsh-mcp-image-generation'
 
     # The API gateway: the transport-agnostic dispatch face every client shape
     # shares. The base layer's agent-default-model service owns the default model.

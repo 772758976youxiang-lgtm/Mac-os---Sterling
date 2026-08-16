@@ -2,6 +2,7 @@
 
 import type { Context, FiberState } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
+import type {} from '@deepseek-ai/dsh-tools'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 // Typert-generated ./typert and ./remote artifacts import Zod at runtime.
 import type {} from 'zod'
@@ -10,6 +11,8 @@ import type {
   PluginFiberPhase,
   PluginInventoryEntry,
   PluginInventorySnapshot,
+  McpInventorySnapshot,
+  McpServerInventoryEntry,
 } from './types.ts'
 
 export type * from './types.ts'
@@ -39,6 +42,22 @@ const FIBER_PHASE = {
   [FIBER_STATE.UNLOADING]: 'unloading',
 } as const satisfies Record<FiberState, PluginFiberPhase>
 
+const MCP_CLIENT_MODULE = '@deepseek-ai/dsh-mcp-client'
+const MCP_IMAGE_GENERATION_MODULE = '@deepseek-ai/dsh-mcp-image-generation'
+
+/** Read the non-sensitive MCP facts that remain meaningful in a Loader entry. */
+function mcpConfig(config: unknown): { serverName: string; transport: McpServerInventoryEntry['transport'] } | undefined {
+  if (config === null || typeof config !== 'object') return undefined
+  const candidate = config as { serverName?: unknown; transport?: unknown }
+  if (typeof candidate.serverName !== 'string') return undefined
+  return {
+    serverName: candidate.serverName,
+    transport: candidate.transport === 'stdio' || candidate.transport === 'streamable-http'
+      ? candidate.transport
+      : null,
+  }
+}
+
 /** Remote-only service exposing the Loader's current non-group entry state. */
 export class PluginInventoryGateway extends TypertRemoteService {
   static inject = ['loader']
@@ -66,6 +85,40 @@ export class PluginInventoryGateway extends TypertRemoteService {
       })
     }
     return { entries }
+  }
+
+  /**
+   * Read configured MCP clients and their currently registered capabilities.
+   * Connection secrets and transport-specific process details never cross this
+   * Remote; the browser only needs the namespace, lifecycle, and discoverable
+   * tools it can show in Settings.
+   * @returns Current MCP server capability inventory in Loader order.
+   */
+  @Remote('mcp')
+  mcp(): McpInventorySnapshot {
+    const schemas = this.ctx.get('tools')?.schemas() ?? []
+    const servers: McpServerInventoryEntry[] = []
+    for (const entry of this.ctx.loader.entries()) {
+      if (entry.options.group) continue
+      const config = entry.options.name === MCP_IMAGE_GENERATION_MODULE
+        ? { serverName: 'image', transport: 'local' as const }
+        : entry.options.name === MCP_CLIENT_MODULE ? mcpConfig(entry.options.config) : undefined
+      if (config === undefined) continue
+      const prefixes = config.serverName === 'image'
+        ? ['mcp__image__', 'mcp__vision__']
+        : [`mcp__${config.serverName}__`]
+      servers.push({
+        entryId: pluginEntryId(entry.id),
+        serverName: config.serverName,
+        transport: config.transport,
+        enabled: !entry.disabled,
+        fiberPhase: entry.fiber === undefined ? null : FIBER_PHASE[entry.fiber.state],
+        tools: schemas
+          .filter(schema => prefixes.some(prefix => schema.name.startsWith(prefix)))
+          .map(({ name, description }) => ({ name, description })),
+      })
+    }
+    return { servers }
   }
 }
 

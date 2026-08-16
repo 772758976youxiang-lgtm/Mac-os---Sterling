@@ -59,7 +59,11 @@ export interface Config {
    * @default 1024
    */
   coldBlankProbeMaxBytes?: number
-  /** Image-capable model used for one automatic fallback turn from a text-only model. */
+  /**
+   * Legacy configuration accepted for profile compatibility. Attached-image
+   * turns remain on the session's selected route and use image tools instead.
+   * @deprecated No longer changes model routing.
+   */
   imageFallback?: {
     provider: string
     model: string
@@ -112,7 +116,6 @@ export class ApiProxyService extends Service implements ApiProxy {
       ...(config.coldBlankProbeMaxBytes === undefined
         ? {}
         : { coldBlankProbeMaxBytes: config.coldBlankProbeMaxBytes }),
-      ...(config.imageFallback === undefined ? {} : { imageFallback: config.imageFallback }),
     })
     this.sessions = api.sessions
     this.subagents = api.subagents

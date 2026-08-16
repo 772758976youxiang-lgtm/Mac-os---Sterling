@@ -133,7 +133,7 @@ describe('serializeMessages', () => {
     expect(wire).toEqual([{ role: 'user', content: 'see chart' }])
   })
 
-  it('omits historical image blocks while preserving accompanying text', () => {
+  it('replaces an image block with a text-only analysis notice', () => {
     expect(serializeMessages([createUserMessage({
       content: [{
         type: 'image',
@@ -143,7 +143,10 @@ describe('serializeMessages', () => {
         },
       }, { type: 'text', text: 'Describe this image.' }],
       source: { kind: 'plugin', plugin: 'test' },
-    })])).toEqual([{ role: 'user', content: 'Describe this image.' }])
+    })])).toEqual([{
+      role: 'user',
+      content: 'Describe this image.\n[The user attached an image. This route cannot inspect image bytes directly; use an available image-analysis tool when needed.]',
+    }])
   })
 
   it('emits an empty user message rather than dropping block-less messages', () => {

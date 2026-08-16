@@ -5,12 +5,22 @@ export type PluginsSettingsLocaleKey =
   | 'nav' | 'title' | 'intro' | 'tabs' | 'configurableTab' | 'empty'
   | 'overridden' | 'reset' | 'readOnly' | 'expand' | 'collapse'
   | 'save' | 'saving' | 'discard' | 'unsaved' | 'saveFailed' | 'invalidNumber'
+  | 'invalidText'
   | 'bashTitle' | 'bashDescription' | 'bashTimeoutMs' | 'bashTimeoutMsHint'
   | 'bashMaxOutputBytes' | 'bashMaxOutputBytesHint'
   | 'agentLoopTitle' | 'agentLoopDescription' | 'agentLoopMaxParallel' | 'agentLoopMaxParallelHint'
   | 'webSearchTitle' | 'webSearchDescription'
   | 'webSearchApiKey' | 'webSearchApiKeyHint' | 'webSearchApiKeySet' | 'webSearchApiKeyUnset'
   | 'webSearchBaseUrl' | 'webSearchBaseUrlHint' | 'webSearchMaxUses' | 'webSearchMaxUsesHint'
+  | 'emailDigestTitle' | 'emailDigestDescription'
+  | 'emailDigestEnabled' | 'emailDigestEnabledHint'
+  | 'emailDigestHost' | 'emailDigestHostHint' | 'emailDigestPort' | 'emailDigestPortHint'
+  | 'emailDigestSecure' | 'emailDigestSecureHint' | 'emailDigestUsername' | 'emailDigestUsernameHint'
+  | 'emailDigestPasswordRef' | 'emailDigestPasswordRefHint' | 'emailDigestPassword' | 'emailDigestPasswordHint'
+  | 'emailDigestPasswordSet' | 'emailDigestPasswordUnset'
+  | 'emailDigestRecipients' | 'emailDigestRecipientsHint' | 'emailDigestSendAt' | 'emailDigestSendAtHint'
+  | 'emailDigestTimeZone' | 'emailDigestTimeZoneHint' | 'emailDigestFrom' | 'emailDigestFromHint'
+  | 'emailDigestSubject' | 'emailDigestSubjectHint' | 'emailDigestRetry' | 'emailDigestRetryHint'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -31,6 +41,7 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   unsaved: 'Unsaved',
   saveFailed: 'The deployment did not accept these values; they were left for you to correct.',
   invalidNumber: 'Enter a number, or leave blank to use the default.',
+  invalidText: 'Enter a value or leave blank to use the default.',
   bashTitle: 'Shell',
   bashDescription: 'Limits every command the agent runs.',
   bashTimeoutMs: 'Command timeout (ms)',
@@ -51,6 +62,36 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchBaseUrlHint: 'Leave blank to use the provider default.',
   webSearchMaxUses: 'Max searches per request',
   webSearchMaxUsesHint: 'How many times one request may search before it must answer.',
+  emailDigestTitle: 'Email digest',
+  emailDigestDescription: 'Send completed scheduled results over SMTP each day.',
+  emailDigestEnabled: 'Enable email digest',
+  emailDigestEnabledHint: 'Only enabled digests collect results and send daily email.',
+  emailDigestHost: 'SMTP host',
+  emailDigestHostHint: 'For QQ use smtp.qq.com; for 163 use smtp.163.com.',
+  emailDigestPort: 'SMTP port',
+  emailDigestPortHint: '465 is typical for secure SMTP.',
+  emailDigestSecure: 'Use secure SMTP',
+  emailDigestSecureHint: 'Enable TLS from the start of the connection.',
+  emailDigestUsername: 'SMTP username',
+  emailDigestUsernameHint: 'Usually the full mailbox address.',
+  emailDigestPasswordRef: 'Credential reference',
+  emailDigestPasswordRefHint: 'The environment or credential-store name used for the authorization code.',
+  emailDigestPassword: 'Client authorization code',
+  emailDigestPasswordHint: 'Stored in the credential store, never in the settings file.',
+  emailDigestPasswordSet: 'Authorization code configured.',
+  emailDigestPasswordUnset: 'No authorization code configured.',
+  emailDigestRecipients: 'Recipients',
+  emailDigestRecipientsHint: 'Separate multiple email addresses with commas.',
+  emailDigestSendAt: 'Daily send time',
+  emailDigestSendAtHint: 'Use 24-hour HH:mm, for example 18:00.',
+  emailDigestTimeZone: 'Time zone',
+  emailDigestTimeZoneHint: 'Use an IANA zone such as Asia/Shanghai.',
+  emailDigestFrom: 'From address',
+  emailDigestFromHint: 'Must be accepted by the SMTP provider.',
+  emailDigestSubject: 'Subject prefix',
+  emailDigestSubjectHint: 'The date is appended to this subject.',
+  emailDigestRetry: 'Retry delay (minutes)',
+  emailDigestRetryHint: 'How long to wait after a failed delivery.',
 }
 
 /** Simplified Chinese copy. */
@@ -72,6 +113,7 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   unsaved: '未保存',
   saveFailed: '本部署没有接受这些值，已保留供你修改。',
   invalidNumber: '请填数字；留空表示使用默认值。',
+  invalidText: '请填写内容；留空表示使用默认值。',
   bashTitle: '终端',
   bashDescription: '限制 agent 运行的每一条命令。',
   bashTimeoutMs: '命令超时（毫秒）',
@@ -92,4 +134,34 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   webSearchBaseUrlHint: '留空则使用提供方默认地址。',
   webSearchMaxUses: '单次请求最多搜索次数',
   webSearchMaxUsesHint: '一次请求在必须作答前最多可以搜索多少次。',
+  emailDigestTitle: '邮件日报',
+  emailDigestDescription: '每天通过 SMTP 发送已完成的定时任务结果。',
+  emailDigestEnabled: '启用邮件日报',
+  emailDigestEnabledHint: '只有启用后才会收集结果并每天发送邮件。',
+  emailDigestHost: 'SMTP 服务器',
+  emailDigestHostHint: 'QQ 使用 smtp.qq.com；163 使用 smtp.163.com。',
+  emailDigestPort: 'SMTP 端口',
+  emailDigestPortHint: '安全 SMTP 通常使用 465。',
+  emailDigestSecure: '启用安全 SMTP',
+  emailDigestSecureHint: '从连接开始就使用 TLS。',
+  emailDigestUsername: 'SMTP 用户名',
+  emailDigestUsernameHint: '通常填写完整邮箱地址。',
+  emailDigestPasswordRef: '凭据引用',
+  emailDigestPasswordRefHint: '用于读取授权码的环境变量或凭据存储名称。',
+  emailDigestPassword: '客户端授权码',
+  emailDigestPasswordHint: '写入凭据存储，不会保存到设置文件。',
+  emailDigestPasswordSet: '已配置授权码。',
+  emailDigestPasswordUnset: '尚未配置授权码。',
+  emailDigestRecipients: '收件人',
+  emailDigestRecipientsHint: '多个邮箱请用逗号分隔。',
+  emailDigestSendAt: '每日发送时间',
+  emailDigestSendAtHint: '使用 24 小时制 HH:mm，例如 18:00。',
+  emailDigestTimeZone: '时区',
+  emailDigestTimeZoneHint: '使用 IANA 时区，例如 Asia/Shanghai。',
+  emailDigestFrom: '发件地址',
+  emailDigestFromHint: '必须被 SMTP 服务商接受。',
+  emailDigestSubject: '主题前缀',
+  emailDigestSubjectHint: '日期会自动追加到主题末尾。',
+  emailDigestRetry: '失败重试间隔（分钟）',
+  emailDigestRetryHint: '投递失败后等待多久再重试。',
 }

@@ -88,7 +88,7 @@ providers:
 
 ### OpenAI 图像生成
 
-若路由下的模型实现 OpenAI Image API，选择 `openai-image-generations`。该路由默认声明文本和图片输入能力，因此附加参考图时会保持当前生图模型，不会触发宿主的视觉模型回退。纯文本消息以 JSON 请求 `/images/generations`；含一张或多张图片的消息会读取其持久化字节，并以 multipart 的 `image[]` 字段请求 `/images/edits`。两种路径都将最新一条用户文本作为 `prompt` 发送，按配置请求图片响应编码，通过持久化附件服务保存每张返回的光栅图，并向会话视图发出助手图片块。默认值与给出的调用一致：`1024x1024`、`high`、一张图和 `b64_json`。
+若路由下的模型实现 OpenAI Image API，选择 `openai-image-generations`。该路由默认声明文本和图片输入能力，因此附加参考图时会保持当前生图模型，不会触发宿主的视觉模型回退。纯文本消息以 JSON 请求 `/images/generations`；含一张或多张图片的消息会读取其持久化字节，并以 multipart 的 `image[]` 字段请求 `/images/edits`。两种路径通常把最新一条直接用户文本作为 `prompt`；标记为 `purpose: 'image-generation'` 的辅助请求也可以提供明确的插件 prompt，其他插件上下文不会成为 Image API prompt。请求级 `GenerateOptions.imageGeneration` 会在本次调用中覆盖配置的 `size`、`quality` 与 `n`；未提供的值继承路由配置，而 `responseFormat` 仍由路由持有。适配器通过持久化附件服务保存每张返回的光栅图，并发出图片块。默认值与给出的调用一致：`1024x1024`、`high`、一张图和 `b64_json`。
 
 ```yaml
 providers:

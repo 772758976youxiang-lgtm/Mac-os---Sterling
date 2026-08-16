@@ -21,6 +21,7 @@
   - paragraph: 配置和查看本部署已安装的插件。
   - tablist "插件视图":
     - tab "插件配置" [selected]
+    - tab "MCP 管理"
     - tab "插件列表"
   - tabpanel "插件配置":
     - list:
@@ -35,4 +36,8 @@
       - listitem:
         - 'button "展开设置: 网页搜索"':
           - text: 网页搜索 DeepSeek 搜索提供方。
+          - img
+      - listitem:
+        - 'button "展开设置: 邮件日报"':
+          - text: 邮件日报 每天通过 SMTP 发送已完成的定时任务结果。
           - img
