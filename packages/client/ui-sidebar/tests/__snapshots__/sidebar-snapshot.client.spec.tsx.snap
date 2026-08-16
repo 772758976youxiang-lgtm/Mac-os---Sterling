@@ -22,13 +22,13 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
         type="button"
       >
         <svg
-          aria-hidden="true"
           class="railFish"
-          data-content="965fe321"
+          data-content="163bba65"
           fill="none"
-          height="17.6580310880829"
-          viewBox="0 0 23.16 17.04"
+          height="24"
+          viewBox="0 0 16 16"
           width="24"
+          xmlns="http://www.w3.org/2000/svg"
         />
         <svg
           class="panelIcon"
@@ -104,14 +104,21 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
         class="brand wide"
         type="button"
       >
-        <svg
+        <span
           aria-hidden="true"
-          data-content="951274b9"
-          fill="none"
-          height="24"
-          viewBox="0 0 182 24"
-          width="182"
-        />
+          style="display: inline-flex; align-items: center; gap: 6px; line-height: 1; white-space: nowrap;"
+        >
+          <span
+            style="font-size: 24px; font-weight: 650; letter-spacing: 0px;"
+          >
+            Sterling
+          </span>
+          <span
+            style="padding: 2px 4px; border-radius: 2px; background: currentcolor; color: var(--dsw-alias-label-primary-inverted); font-size: 10px; font-weight: 700; letter-spacing: 0px; line-height: 1.2;"
+          >
+            HARNESS
+          </span>
+        </span>
       </button>
       <div
         data-slot="sidebar.brand.action"
@@ -201,14 +208,21 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
         class="brand wide"
         type="button"
       >
-        <svg
+        <span
           aria-hidden="true"
-          data-content="951274b9"
-          fill="none"
-          height="24"
-          viewBox="0 0 182 24"
-          width="182"
-        />
+          style="display: inline-flex; align-items: center; gap: 6px; line-height: 1; white-space: nowrap;"
+        >
+          <span
+            style="font-size: 24px; font-weight: 650; letter-spacing: 0px;"
+          >
+            Sterling
+          </span>
+          <span
+            style="padding: 2px 4px; border-radius: 2px; background: currentcolor; color: var(--dsw-alias-label-primary-inverted); font-size: 10px; font-weight: 700; letter-spacing: 0px; line-height: 1.2;"
+          >
+            HARNESS
+          </span>
+        </span>
       </button>
       <div
         data-slot="sidebar.brand.action"

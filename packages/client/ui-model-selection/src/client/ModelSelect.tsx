@@ -4,7 +4,7 @@
  * the Model / Effort row pair (label + current value + a right chevron),
  * each drilling into its own list — the provider-grouped model list over
  * the shared directory, and the effort levels. A three-or-more-level effort
- * range is a discrete slider; short/provider-default ranges stay a list. The trigger (313:14108's
+ * range is a discrete slider; a single/provider-default range stays a list. The trigger (313:14108's
  * ToggleButton) shows both: model name + effort in the caption tone.
  * Data and submission ride the SAME per-session ModelDirectory as the
  * /model popup; exact-model reasoning metadata and the selected effort come
@@ -53,14 +53,14 @@ export function ModelSelect(
   )
   const [open, setOpen] = useState(false)
   const [pane, setPane] = useState<Pane>('root')
-  const [draftEffort, setDraftEffort] = useState<string | undefined>(undefined)
+  const [draftEffortIndex, setDraftEffortIndex] = useState<number | undefined>(undefined)
   const [liquidProgress, setLiquidProgress] = useState<number | undefined>(undefined)
   // The in-menu error strip serves catalog loads (its Retry re-runs the
   // load); a rejected SELECTION announces through the transient toast
   // instead, so the strip renders only while the latest failure-capable
   // action was a load.
   const lastActionRef = useRef<'load' | 'select'>('load')
-  const draftEffortRef = useRef<string | undefined>(undefined)
+  const draftEffortIndexRef = useRef<number | undefined>(undefined)
   const draggingRef = useRef(false)
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
   const toastSeq = useRef(0)
@@ -105,18 +105,18 @@ export function ModelSelect(
         ...effort.description === undefined ? {} : { description: effort.description },
       })),
     ], [reasoning, t])
-  const sliderChoices = effortChoices.filter((choice): choice is EffortChoice & { effort: string } => choice.effort !== undefined)
-  const showEffortSlider = effortChoices.length === sliderChoices.length && sliderChoices.length >= 3
-  const displayedEffort = draftEffort ?? effectiveEffort
-  const sliderIndex = Math.max(0, sliderChoices.findIndex(choice => choice.effort === displayedEffort))
+  const sliderChoices = effortChoices
+  const showEffortSlider = (reasoning?.efforts.length ?? 0) >= 2
+  const selectedEffortIndex = Math.max(0, sliderChoices.findIndex(choice => choice.effort === effectiveEffort))
+  const sliderIndex = draftEffortIndex ?? selectedEffortIndex
   const selectedProgress = sliderChoices.length <= 1 ? 0 : sliderIndex / (sliderChoices.length - 1)
   const displayedProgress = liquidProgress ?? selectedProgress
   const isMaximumEffort = displayedProgress >= .995
   const busy = state.status === 'selecting'
 
   useEffect(() => {
-    setDraftEffort(undefined)
-    draftEffortRef.current = undefined
+    setDraftEffortIndex(undefined)
+    draftEffortIndexRef.current = undefined
     setLiquidProgress(undefined)
   }, [effectiveEffort, state.current?.provider, state.current?.model])
 
@@ -223,9 +223,11 @@ export function ModelSelect(
 
   const commitDraftEffort = (): void => {
     draggingRef.current = false
-    const effort = draftEffortRef.current
-    draftEffortRef.current = undefined
-    if (effort !== undefined && effort !== effectiveEffort) chooseEffort(effort)
+    const index = draftEffortIndexRef.current
+    draftEffortIndexRef.current = undefined
+    if (index === undefined) return
+    const choice = sliderChoices[index]
+    if (choice !== undefined && choice.effort !== effectiveEffort) chooseEffort(choice.effort)
   }
 
   const setProgressFromPointer = (clientX: number, target: HTMLInputElement): void => {
@@ -233,10 +235,9 @@ export function ModelSelect(
     if (bounds.width <= 0 || sliderChoices.length === 0) return
     const progress = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width))
     const index = Math.round(progress * (sliderChoices.length - 1))
-    const effort = sliderChoices[index]?.effort
-    if (effort === undefined) return
-    draftEffortRef.current = effort
-    setDraftEffort(effort)
+    if (sliderChoices[index] === undefined) return
+    draftEffortIndexRef.current = index
+    setDraftEffortIndex(index)
     setLiquidProgress(progress)
   }
 
@@ -407,14 +408,18 @@ export function ModelSelect(
                           onChange={(event) => {
                             const choice = sliderChoices[Number(event.currentTarget.value)]
                             if (choice !== undefined) {
-                              draftEffortRef.current = choice.effort
-                              setDraftEffort(choice.effort)
-                              setLiquidProgress(Number(event.currentTarget.value) / (sliderChoices.length - 1))
+                              const index = Number(event.currentTarget.value)
+                              draftEffortIndexRef.current = index
+                              setDraftEffortIndex(index)
+                              setLiquidProgress(index / (sliderChoices.length - 1))
                             }
                           }}
                           onPointerDown={(event) => {
                             draggingRef.current = true
-                            event.currentTarget.setPointerCapture?.(event.pointerId)
+                            const target = event.currentTarget as unknown as {
+                              setPointerCapture?: (pointerId: number) => void
+                            }
+                            target.setPointerCapture?.(event.pointerId)
                             setProgressFromPointer(event.clientX, event.currentTarget)
                           }}
                           onPointerMove={(event) => {
@@ -422,8 +427,12 @@ export function ModelSelect(
                           }}
                           onPointerUp={(event) => {
                             setProgressFromPointer(event.clientX, event.currentTarget)
-                            if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-                              event.currentTarget.releasePointerCapture?.(event.pointerId)
+                            const target = event.currentTarget as unknown as {
+                              hasPointerCapture?: (pointerId: number) => boolean
+                              releasePointerCapture?: (pointerId: number) => void
+                            }
+                            if (target.hasPointerCapture?.(event.pointerId)) {
+                              target.releasePointerCapture?.(event.pointerId)
                             }
                             commitDraftEffort()
                           }}

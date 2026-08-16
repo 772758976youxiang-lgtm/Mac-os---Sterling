@@ -66,3 +66,13 @@ describe('FishLogo', () => {
     expect(container.innerHTML).not.toContain('M0 0L23.16')
   })
 })
+
+describe('SterlingWordmark', () => {
+  it('renders the Sterling Harness name at the requested size', () => {
+    const { getByText } = render(<primitives.SterlingWordmark size={20} className="brand" />)
+    const sterling = getByText('Sterling')
+    expect(sterling.parentElement?.classList.contains('brand')).toBe(true)
+    expect((sterling as HTMLElement).style.fontSize).toBe('20px')
+    expect(getByText('HARNESS')).toBeTruthy()
+  })
+})

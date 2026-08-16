@@ -30,6 +30,8 @@ Schedule 负责确定性的日历规范化。落在夏令时缺口内的本地�
 
 一条 Agent-scoped 队列会将每项已接纳的管理事务与 live owner 的到期事务从 preflight 到任何 post-append barrier 全程串行化。`schedule_create` 要求 `after_seconds`、`at` 与 `every_seconds` 有且只有一项；它会在进入队列前验证只依赖输入形状的失败，随后执行检查点、分配永不复用的 id、追加 create，再次执行检查点。`schedule_list` 按创建顺序返回活动记录，其中包含 `state: "scheduled" | "overdue"` 与 `deliveryMode: "session-local"`。`schedule_delete` 会在进入队列前拒绝空 id 或前后带空白的 id，并只为活动 id 追加事件；未知或已终结的 id 会在 preflight 后返回 `{ id, deleted: false, code: "schedule_not_found" }`。
 
+`ScheduleService` 拥有该队列，并以 camelCase 规则字段向 Host 调用方公开相同的 create、list 与 delete 操作。其 update 操作通过在同一个受管事务中为活动 id 追加 delete、再为新分配的 id 追加 create 来保持事件日志不可变，随后为组合追加执行一次持久化 barrier。模型工具仍然是该服务之上的适配器，并保留既有 snake_case 协议。
+
 每次成功的管理 preflight 还会要求 live owner 重新计算。如果先前的 post-append barrier 返回 `persistence_uncertain`，这会恢复所保留的 create 或 delete batch，而无需 Schedule 专属的持久化重试 timer。
 
 版本 1 的封闭领域错误代码包括 `invalid_prompt`、`invalid_selector`、`invalid_rule`、`invalid_time_zone`、`not_future`、`time_out_of_range`、`frequency_too_high`、`corrupt_schedule_log`、`persistence_uncertain` 和 `internal_error`。诊断文本保持稳定，不会暴露后端异常。渲染内容是规范值的确定性 JSON；通用工具结果策略仍负责模型可见内容的 spill 行为。

@@ -12,6 +12,8 @@ Open **Settings → Models**. The DeepSeek card exposes one API-key field; enter
 
 Keys are write-only. The page receives a redacted descriptor after saving, never the literal secret. The key is stored in `$DSH_HOME/.credentials.yaml`, while settings retain only its credential reference.
 
+Editing a provider therefore leaves its API-key field empty. The placeholder indicates that a credential is already configured; entering a value replaces only that provider's credential, while leaving it empty keeps the existing one.
+
 ## Add a catalog provider
 
 Choose **Add provider**, select a provider such as Anthropic or OpenAI, enter its API key, and save. The installed catalog supplies the endpoint, protocol, and model list.
@@ -30,9 +32,11 @@ Under **Model catalog**, choose **Fetch available models** to query the base URL
 
 ### Image input
 
-A model you enter by hand is treated as text-only until it says otherwise, because nothing can ask an endpoint which modalities it accepts. Attaching an image to such a model is refused before it is sent, naming the model.
+When **Fetch available models** returns explicit input-modality metadata, Harness adopts it with the selected model. This includes listings that expose `input_modalities` directly or under `architecture`, such as OpenRouter. The adapter also has a curated correction for the known multimodal `qwen3.7-flash` id.
 
-A vision model on a custom provider therefore needs one line. The form has no field for it; add `input` to the model in `$DSH_HOME/settings.yaml`:
+For a listing that reports ids only, expand the model's **Advanced** controls and choose **Text + image**. Keep **Automatic** to use the installed catalog, the exact known-model correction, or the provider's conservative fallback. Choose **Text only** to override a catalog or gateway claim that does not match the endpoint you use.
+
+The same setting can be written as `input` in `$DSH_HOME/settings.yaml`:
 
 ```yaml
 llm-pi-ai:
@@ -47,7 +51,7 @@ llm-pi-ai:
           input: [text, image]
 ```
 
-`input` accepts `text` and `image`, and applies to that model alone, so one route can serve both kinds. Omitting it — or writing an empty list, which means the same thing — keeps whatever the installed catalog records for that model, and falls back to the route's `defaultInput` for a model the catalog does not describe.
+`input` accepts `text` and `image`, and applies to that model alone, so one route can serve both kinds. Omitting it — or writing an empty list, which means the same thing — is the form's **Automatic** mode: it keeps whatever the installed catalog records for that model, and falls back to the route's `defaultInput` for a model the catalog does not describe.
 
 If every model you entered by hand takes images, set the fallback once on the route instead of on each of them:
 
@@ -79,6 +83,12 @@ Every list must name at least one modality except a model's own, where an empty 
 
 Both fields state a claim about your endpoint rather than checking it. A model that declares images its endpoint does not serve is not caught here; the provider rejects the request instead.
 
+### Reasoning levels
+
+When **Fetch available models** returns structured reasoning metadata, Harness adopts the model's supported levels and adds them to that model's reasoning selector. OpenRouter-style `reasoning.supported_efforts` is supported, including whether reasoning is mandatory; a model that permits disabling reasoning also receives an **Off** level. `qwen3.7-flash` and its dated model id have a curated **Off** / **High** correction when the listing omits that metadata: on Qwen's Chat Completions API these represent disabling or enabling its hybrid thinking mode, not discrete `reasoning_effort` intensity levels.
+
+There is no universal OpenAI-compatible endpoint for this capability. A listing that reports ids only and has no curated or installed-catalog entry remains on the provider default rather than being probed with a paid generation request. For such models, declare `reasoningEfforts` in `settings.yaml`; each key is a selector level and each value is the spelling sent to the provider. See the [pi-ai adapter reference](../../../packages/llm/llm-pi-ai/README.md#per-model-reasoning-efforts) for the exact format.
+
 ## Select a model
 
 Configured providers appear in the model picker. Selecting a model also makes it the default for new sessions. A session that has already sent a request retains the model recorded in its own log.
@@ -90,7 +100,8 @@ If a saved default names a provider that was deleted, the composer displays **Se
 - **`MISSING_CREDENTIAL`** — Store the provider key through the Models page or supply the referenced environment variable.
 - **`UNKNOWN_MODEL`** — Select a configured model or add the missing model to the custom provider.
 - **Fetching available models returns 401** — Check the key. Model discovery calls the OpenAI-compatible `GET /models` endpoint; enter models manually for endpoints that do not provide it.
-- **An image is refused before sending** — The model declares no image modality. Give a custom provider's model `input: [text, image]`; DeepSeek's own chat-completions route is text-only and cannot be configured otherwise.
+- **A provider key appears in the wrong editor** — Reload after updating to a build with isolated credential fields. Harness never returns stored key text to the form; browser or password-manager autofill should leave these fields alone.
+- **An image is refused before sending** — The model declares no image modality. Give a custom provider's model `input: [text, image]`; `qwen3.7-flash` is recognized automatically, while DeepSeek's own chat-completions route is text-only and cannot be configured otherwise.
 - **The provider rejects a request carrying an image** — The model declares images its endpoint does not actually serve. Remove `image` from whichever list granted it — the model's `input`, or the route's `defaultInput` — then start a new session: the attached image stays in the session log, so the same request repeats until the session moves off it.
 
 ## Advanced configuration

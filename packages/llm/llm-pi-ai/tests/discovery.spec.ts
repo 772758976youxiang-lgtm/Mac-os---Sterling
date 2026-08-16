@@ -110,7 +110,11 @@ describe('draft-provider model discovery', () => {
     const server = await listingServer({
       body: JSON.stringify({
         data: [
-          { id: 'acme-large', display_name: 'Acme Large', context_length: 65_536, max_output_tokens: 4096 },
+          {
+            id: 'acme-large', display_name: 'Acme Large', context_length: 65_536, max_output_tokens: 4096,
+            architecture: { input_modalities: ['text', 'image', 'audio'] },
+            reasoning: { supported_efforts: ['xhigh', 'medium', 'low', 'unknown'], mandatory: false },
+          },
           { id: 'acme-small' },
         ],
       }),
@@ -120,12 +124,53 @@ describe('draft-provider model discovery', () => {
     const models = await ctx.llm.discoverModels('llm-pi-ai', { baseURL: `${server.url}/v1`, apiKey: 'probe-key' })
 
     expect(models).toEqual([
-      { id: 'acme-large', name: 'Acme Large', contextWindow: 65_536, maxTokens: 4096 },
+      {
+        id: 'acme-large',
+        name: 'Acme Large',
+        contextWindow: 65_536,
+        maxTokens: 4096,
+        inputModalities: ['text', 'image'],
+        reasoningEfforts: [
+          { id: 'off', wireValue: 'none' },
+          { id: 'low', wireValue: 'low' },
+          { id: 'medium', wireValue: 'medium' },
+          { id: 'xhigh', wireValue: 'xhigh' },
+        ],
+      },
       { id: 'acme-small' },
     ])
     expect(server.paths).toEqual(['/v1/models'])
     expect(server.headers[0]?.authorization).toBe('Bearer probe-key')
     expect(server.headers[0]?.['user-agent']).toBe(userAgent())
+  })
+
+  it('uses an exact known capability when a listing omits modality metadata', async () => {
+    const server = await listingServer({ body: JSON.stringify({ data: [{ id: 'Qwen3.7-Flash' }] }) })
+    const ctx = await harness()
+
+    await expect(ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url }))
+      .resolves.toEqual([{
+        id: 'Qwen3.7-Flash',
+        inputModalities: ['text', 'image'],
+        reasoningEfforts: [
+          { id: 'off', wireValue: 'none' },
+          { id: 'high', wireValue: 'high' },
+        ],
+      }])
+  })
+
+  it('does not invent an off mode for mandatory reasoning', async () => {
+    const server = await listingServer({
+      body: JSON.stringify({
+        data: [{ id: 'must-think', reasoning: { supported_efforts: ['high', 'low'], mandatory: true } }],
+      }),
+    })
+    const ctx = await harness()
+
+    await expect(ctx.llm.discoverModels('llm-pi-ai', { baseURL: server.url })).resolves.toEqual([{
+      id: 'must-think',
+      reasoningEfforts: [{ id: 'low', wireValue: 'low' }, { id: 'high', wireValue: 'high' }],
+    }])
   })
 
   it('keeps a deployment path instead of resolving it away', async () => {

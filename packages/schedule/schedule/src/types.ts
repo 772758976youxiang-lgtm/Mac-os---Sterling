@@ -121,6 +121,18 @@ export type ScheduleView = ScheduleRecord & {
 /** Management operations whose persistence barrier may be uncertain. */
 export type SchedulePersistenceOperation = 'create' | 'list' | 'delete'
 
+/** Shared input accepted by model tools and human-facing Schedule management. */
+export interface ScheduleRuleInput {
+  /** Reminder content presented when the target becomes due. */
+  readonly prompt: string
+  /** Positive one-shot delay in seconds. */
+  readonly afterSeconds?: number
+  /** Absolute target with an explicit offset or local time zone. */
+  readonly at?: AtInput
+  /** Fixed-rate interval in seconds. */
+  readonly everySeconds?: number
+}
+
 /** Stable error returned for an empty reminder prompt. */
 export interface InvalidPromptError {
   readonly code: 'invalid_prompt'
@@ -209,6 +221,12 @@ export type ScheduleDeleteResult =
 
 /** Canonical `schedule_delete` value. */
 export type ScheduleDeleteValue = ScheduleDeleteResult | ScheduleToolError
+
+/** Canonical result of replacing one active reminder with a new rule. */
+export type ScheduleUpdateValue =
+  | ScheduleView
+  | { readonly id: ScheduleId; readonly deleted: false; readonly code: 'schedule_not_found' }
+  | ScheduleToolError
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {

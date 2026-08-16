@@ -227,6 +227,18 @@ export interface LlmDiscoveredModel {
   contextWindow?: number
   /** Maximum output tokens, when disclosed. */
   maxTokens?: number
+  /** Accepted input modalities when the discovery source explicitly discloses them. */
+  inputModalities?: readonly ModelModality[]
+  /** Selectable reasoning efforts and their provider wire values, when disclosed. */
+  reasoningEfforts?: readonly LlmDiscoveredReasoningEffort[]
+}
+
+/** One reasoning effort a discovered model can persist into adapter configuration. */
+export interface LlmDiscoveredReasoningEffort {
+  /** Provider-neutral selector id. */
+  id: string
+  /** Value the adapter sends; null means disabling reasoning by omitting its control. */
+  wireValue: string | null
 }
 
 /** One adapter-discovered model; catalog membership is advisory, not request validation. */

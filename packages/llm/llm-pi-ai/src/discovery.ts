@@ -23,9 +23,22 @@
  */
 
 import { INVALID_CREDENTIAL_CODE, LlmError, normalizeApiKey } from '@deepseek-ai/dsh-llm'
-import type { LlmDiscoveredModel, LlmModelDiscoveryRequest } from '@deepseek-ai/dsh-llm'
+import type {
+  LlmDiscoveredModel,
+  LlmDiscoveredReasoningEffort,
+  LlmModelDiscoveryRequest,
+  ModelModality,
+} from '@deepseek-ai/dsh-llm'
 import { attributionHeaders } from '@deepseek-ai/dsh-llm'
-import { catalogModels } from './catalog.ts'
+import { getSupportedThinkingLevels } from '@earendil-works/pi-ai'
+import type { Api, Model } from '@earendil-works/pi-ai'
+import {
+  catalogModels,
+  knownModelInput,
+  knownModelReasoningEfforts,
+  THINKING_LEVELS,
+} from './catalog.ts'
+import type { PiAiReasoningEfforts } from './catalog.ts'
 
 /**
  * Protocols whose model listing this module can read: the OpenAI chat and
@@ -61,6 +74,98 @@ interface ListingEntry {
   context_length?: unknown
   max_tokens?: unknown
   max_output_tokens?: unknown
+  input_modalities?: unknown
+  inputModalities?: unknown
+  architecture?: { input_modalities?: unknown; inputModalities?: unknown } | null
+  reasoning?: unknown
+  reasoning_efforts?: unknown
+  reasoningEfforts?: unknown
+}
+
+/** OpenRouter-style reasoning metadata carried beside one model entry. */
+interface ListingReasoning {
+  supported_efforts?: unknown
+  supportedEfforts?: unknown
+  mandatory?: unknown
+}
+
+/** Read the modalities this build can represent from explicit provider metadata. */
+function inputModalities(entry: ListingEntry): ModelModality[] | undefined {
+  const candidates = [
+    entry.input_modalities,
+    entry.inputModalities,
+    entry.architecture?.input_modalities,
+    entry.architecture?.inputModalities,
+  ]
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue
+    const known = [...new Set(candidate.filter((value): value is ModelModality => value === 'text' || value === 'image'))]
+    if (known.length > 0) return known
+  }
+  return undefined
+}
+
+/** The reasoning levels this adapter can expose and dispatch. */
+const DISCOVERABLE_EFFORTS: ReadonlySet<string> = new Set(THINKING_LEVELS)
+
+/** Normalize one listing effort into the selector id and wire spelling. */
+function listingEffort(raw: unknown): LlmDiscoveredReasoningEffort | undefined {
+  if (typeof raw !== 'string') return undefined
+  if (raw === 'none') return { id: 'off', wireValue: 'none' }
+  if (!DISCOVERABLE_EFFORTS.has(raw)) return undefined
+  return { id: raw, wireValue: raw === 'off' ? null : raw }
+}
+
+/** Convert one configured effort map to detached discovery metadata. */
+function mappedReasoningEfforts(efforts: PiAiReasoningEfforts): LlmDiscoveredReasoningEffort[] | undefined {
+  const discovered = THINKING_LEVELS.flatMap((id) => {
+    const wireValue = efforts[id]
+    return wireValue === undefined ? [] : [{ id, wireValue }]
+  })
+  return discovered.some(effort => effort.id !== 'off') ? discovered : undefined
+}
+
+/** Preserve a catalog model's exact selector-to-wire reasoning mapping. */
+function catalogReasoningEfforts(model: Model<Api>): LlmDiscoveredReasoningEffort[] | undefined {
+  if (!model.reasoning) return undefined
+  const efforts = getSupportedThinkingLevels(model).map((id) => {
+    const mapped = model.thinkingLevelMap?.[id]
+    return {
+      id,
+      wireValue: mapped === undefined ? (id === 'off' ? null : id) : mapped,
+    }
+  }).filter(effort => effort.wireValue !== null || effort.id === 'off')
+  return efforts.some(effort => effort.id !== 'off') ? efforts : undefined
+}
+
+/** Read explicit supported reasoning efforts from one provider listing row. */
+function listingReasoningEfforts(entry: ListingEntry): LlmDiscoveredReasoningEffort[] | undefined {
+  const reasoning = typeof entry.reasoning === 'object' && entry.reasoning !== null
+    ? entry.reasoning as ListingReasoning
+    : undefined
+  const candidates = [
+    reasoning?.supported_efforts,
+    reasoning?.supportedEfforts,
+    entry.reasoning_efforts,
+    entry.reasoningEfforts,
+  ]
+  for (const candidate of candidates) {
+    const rawEfforts = candidate === null
+      ? THINKING_LEVELS.filter(level => level !== 'off')
+      : Array.isArray(candidate) ? candidate : undefined
+    if (rawEfforts === undefined) continue
+    const byId = new Map<string, LlmDiscoveredReasoningEffort>()
+    for (const raw of rawEfforts) {
+      const effort = listingEffort(raw)
+      if (effort !== undefined) byId.set(effort.id, effort)
+    }
+    if (reasoning !== undefined && reasoning.mandatory !== true && !byId.has('off')) {
+      byId.set('off', { id: 'off', wireValue: 'none' })
+    }
+    const efforts = THINKING_LEVELS.flatMap(id => byId.get(id) ?? [])
+    if (efforts.some(effort => effort.id !== 'off')) return efforts
+  }
+  return undefined
 }
 
 /** A positive integer field of a listing entry, or `undefined` when absent or unusable. */
@@ -153,11 +258,15 @@ function readListing(body: unknown): LlmDiscoveredModel[] {
     const name = label(entry?.name, entry?.display_name)
     const contextWindow = capacity(entry?.context_window, entry?.context_length)
     const maxTokens = capacity(entry?.max_output_tokens, entry?.max_tokens)
+    const modalities = inputModalities(entry ?? {})
+    const reasoningEfforts = listingReasoningEfforts(entry ?? {})
     models.push({
       id,
       ...name === undefined ? {} : { name },
       ...contextWindow === undefined ? {} : { contextWindow },
       ...maxTokens === undefined ? {} : { maxTokens },
+      ...modalities === undefined ? {} : { inputModalities: modalities },
+      ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
     })
   }
   return models
@@ -203,12 +312,17 @@ export async function discoverModels(
   if (request.provider !== undefined) {
     const installed = catalogModels(request.provider)
     if (installed.size > 0) {
-      return [...installed.values()].map(model => ({
-        id: model.id,
-        name: model.name,
-        contextWindow: model.contextWindow,
-        maxTokens: model.maxTokens,
-      }))
+      return [...installed.values()].map((model) => {
+        const reasoningEfforts = catalogReasoningEfforts(model)
+        return {
+          id: model.id,
+          name: model.name,
+          contextWindow: model.contextWindow,
+          maxTokens: model.maxTokens,
+          inputModalities: [...model.input],
+          ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
+        }
+      })
     }
   }
   if (request.baseURL === undefined || request.baseURL.length === 0) {
@@ -282,5 +396,17 @@ export async function discoverModels(
   } catch (error: unknown) {
     throw new LlmError(`${url} did not answer with JSON`, 'DISCOVERY_FAILED', { cause: error })
   }
-  return readListing(body)
+  return readListing(body).map((model) => {
+    const input = model.inputModalities ?? knownModelInput(model.id)
+    const knownReasoning = model.reasoningEfforts === undefined
+      ? knownModelReasoningEfforts(model.id)
+      : undefined
+    const reasoningEfforts = model.reasoningEfforts
+      ?? (knownReasoning === undefined ? undefined : mappedReasoningEfforts(knownReasoning))
+    return {
+      ...model,
+      ...input === undefined ? {} : { inputModalities: [...input] },
+      ...reasoningEfforts === undefined ? {} : { reasoningEfforts },
+    }
+  })
 }

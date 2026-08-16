@@ -42,6 +42,11 @@ export const discoveredModelViewSchema = z.object({
   name: z.string().min(1).optional(),
   contextWindow: z.number().int().positive().optional(),
   maxTokens: z.number().int().positive().optional(),
+  inputModalities: z.array(z.union([z.literal('text'), z.literal('image')])).optional(),
+  reasoningEfforts: z.array(z.object({
+    id: z.string().min(1),
+    wireValue: z.union([z.string().min(1), z.null()]),
+  })).min(1).optional(),
 }) satisfies z.ZodType<Wire<DiscoveredModelView>>
 
 /** llm.discoverModels request payload. */

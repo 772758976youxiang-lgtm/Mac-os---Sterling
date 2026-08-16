@@ -673,3 +673,18 @@ select.input {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+.candidateMeta {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.candidateMetaGroup {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 8px;
+}

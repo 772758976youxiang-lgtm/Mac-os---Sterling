@@ -69,7 +69,7 @@
         sendAt: '18:00'
         timeZone: Asia/Shanghai
         from: disabled@example.com
-        subject: DeepSeek Harness daily digest
+        subject: Sterling Harness daily digest
         retryMinutes: 15
 
     - id: code-runtime
@@ -226,6 +226,9 @@
 
     - id: ui-settings-models
       name: '@deepseek-ai/dsh-client-ui-settings-models'
+
+    - id: ui-settings-schedules
+      name: '@deepseek-ai/dsh-client-ui-settings-schedules'
 
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'

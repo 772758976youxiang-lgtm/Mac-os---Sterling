@@ -48,6 +48,48 @@ function state(overrides: Partial<ModelDirectoryState> = {}): ModelDirectoryStat
 afterEach(cleanup)
 
 describe('ModelSelect reasoning effort', () => {
+  it('renders the slider for a two-level model with a provider-default stop', async () => {
+    const directory = createSnapshotStore<ModelDirectoryState>(state({
+      current: { provider: 'qwen', model: 'qwen3.7-flash' },
+      groups: [{
+        id: 'qwen',
+        name: 'Qwen',
+        models: [{
+          id: 'qwen3.7-flash',
+          name: 'qwen3.7-flash',
+          reasoning: {
+            efforts: [{ id: 'off', name: 'Off' }, { id: 'high', name: 'High' }],
+          },
+        }],
+      }],
+    }))
+    const select = vi.fn().mockResolvedValue(true)
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={select}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: /当前 qwen3\.7-flash/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    const slider = screen.getByRole('slider', { name: '推理等级' })
+    expect(slider.getAttribute('max')).toBe('2')
+    expect(slider.getAttribute('aria-valuetext')).toBe('Default')
+    expect(screen.queryByRole('menuitemradio')).toBeNull()
+    fireEvent.change(slider, { target: { value: '2' } })
+    fireEvent.pointerUp(slider)
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({
+        provider: 'qwen',
+        model: 'qwen3.7-flash',
+        reasoningEffort: 'high',
+      })
+    })
+  })
+
   it('renders adapter metadata and submits the effort as part of the session selection', async () => {
     const directory = createSnapshotStore<ModelDirectoryState>(state())
     const select = vi.fn(async (selection: ModelSelection) => {

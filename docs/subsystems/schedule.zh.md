@@ -177,6 +177,8 @@ type ScheduleView = ScheduleRecord & {
 
 生成的[工具目录](../tool-catalog.md#deepseek-aidsh-schedule)负责 `schedule_create`、`schedule_list` 和 `schedule_delete` 的参数与结果 schema。一条 Agent-scoped 队列将管理调用与到期工作串行化。每次读取或判断都会先等待共享的 Session 持久化 barrier；create 与实际执行的 delete 在追加后还会再次等待。barrier 失败会报告 `persistence_uncertain`，而不是猜测 eager write 是否已提交。其他稳定错误代码是 `invalid_prompt`、`invalid_selector`、`invalid_rule`、`invalid_time_zone`、`not_future`、`time_out_of_range`、`frequency_too_high`、`corrupt_schedule_log` 和 `internal_error`。
 
+`ScheduleService` 是模型工具与 Host API 调用方共享的管理 owner。面向浏览器的 `schedule.list/create/update/delete` RPC 领域会在视图中加入每个 live 根 owner 的会话 id。update 不改变持久事件联合，而是替换一条活动记录：服务在同一个串行事务中为旧 id 追加 delete、再为新分配的 id 追加 create，随后通过一次变更后持久化 barrier 确认组合追加。
+
 ## Live 交付
 
 进程内 owner 根据持久 fold 派生最早的 timer，并在每次有界等待后重新读取墙钟。cold Session 不执行任何工作；重新打开后会重建 timer，并使已经过去的目标进入 overdue 状态。到期的一次性提醒享有优先级，每次只进入一个后续轮次。当没有一次性提醒到期时，所有 overdue 的 Every 记录会组成上述单个批次。

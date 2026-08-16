@@ -214,11 +214,11 @@ describe('createFixtureApi', () => {
     const api = createFixtureApi()
     const settings = await api.settings.describe(req({}))
     if (!settings.result.ok) throw new Error('settings describe failed')
-    expect(settings.result.value.namespaces).toMatchObject([{
+    expect(settings.result.value.namespaces).toContainEqual(expect.objectContaining({
       ns: 'llm-deepseek',
       value: { apiKeyEnv: 'DEEPSEEK_API_KEY' },
       secrets: [{ path: ['apiKey'], set: false }],
-    }])
+    }))
 
     const initial = await api.credentials.describe(req({ refs: ['DEEPSEEK_API_KEY', 'TEST_API_KEY'] }))
     if (!initial.result.ok) throw new Error('credential describe failed')
@@ -238,6 +238,36 @@ describe('createFixtureApi', () => {
     const cleared = await api.credentials.describe(req({ refs: ['TEST_API_KEY'] }))
     if (!cleared.result.ok) throw new Error('credential describe failed')
     expect(cleared.result.value.credentials.TEST_API_KEY).toEqual({ configured: false, writable: true })
+  })
+
+  it('stores the welcome acknowledgement that releases the fixture onboarding notice', async () => {
+    const api = createFixtureApi()
+    const before = await api.settings.describe(req({}))
+    if (!before.result.ok) throw new Error('settings describe failed')
+    expect(before.result.value.namespaces).toContainEqual(expect.objectContaining({
+      ns: 'ui-onboarding', value: {}, revision: 0,
+    }))
+
+    const saved = await api.settings.mutate(req({
+      ns: 'ui-onboarding',
+      ops: [{ op: 'set', path: ['welcomeNoticeVersion'], value: '2026-08-17.1' }],
+    }))
+    expect(saved.result).toMatchObject({
+      ok: true,
+      value: {
+        ns: 'ui-onboarding',
+        value: { welcomeNoticeVersion: '2026-08-17.1' },
+        revision: 1,
+      },
+    })
+
+    const after = await api.settings.describe(req({}))
+    if (!after.result.ok) throw new Error('settings describe failed')
+    expect(after.result.value.namespaces).toContainEqual(expect.objectContaining({
+      ns: 'ui-onboarding',
+      value: { welcomeNoticeVersion: '2026-08-17.1' },
+      revision: 1,
+    }))
   })
 
   it('emits the todo/write snapshot at the real tool boundary: between tool/call and tool/result, timestamps monotonic', async () => {

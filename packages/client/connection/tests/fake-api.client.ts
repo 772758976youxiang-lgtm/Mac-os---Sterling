@@ -224,6 +224,19 @@ export class FakeApiClient implements IApiClient {
     discoverModels: payload => this.record('llm.discoverModels', payload, Promise.resolve(ok({ models: [] }))),
   }
 
+  readonly schedules: IApiClient['schedules'] = {
+    list: payload => this.record('schedule.list', payload, Promise.resolve(ok({ ownerSessionIds: [], items: [] }))),
+    create: payload => this.record('schedule.create', payload, Promise.resolve(ok({
+      ok: false as const, error: { code: 'schedule-unavailable', message: 'fake' },
+    }))),
+    update: payload => this.record('schedule.update', payload, Promise.resolve(ok({
+      ok: false as const, error: { code: 'schedule-unavailable', message: 'fake' },
+    }))),
+    delete: payload => this.record('schedule.delete', payload, Promise.resolve(ok({
+      ok: false as const, error: { code: 'schedule-unavailable', message: 'fake' },
+    }))),
+  }
+
   /** When true, streams never fire onOpen (misbehaving-carrier material for the handshake timeout guard). */
   suppressStreamOpen = false
 

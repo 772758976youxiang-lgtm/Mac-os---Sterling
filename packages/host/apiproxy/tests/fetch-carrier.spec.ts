@@ -282,6 +282,26 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { models: [] } } }
       },
     },
+    schedules: {
+      async list(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { ownerSessionIds: [], items: [] } } }
+      },
+      async create(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: {
+          ok: false as const, error: { code: 'schedule-unavailable', message: 'stub' },
+        } } }
+      },
+      async update(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: {
+          ok: false as const, error: { code: 'schedule-unavailable', message: 'stub' },
+        } } }
+      },
+      async delete(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: {
+          ok: false as const, error: { code: 'schedule-unavailable', message: 'stub' },
+        } } }
+      },
+    },
     events: {
       mux: (_request, signal) => stream(muxFrames, signal),
       host: (_request, signal) => stream(hostFrames, signal),

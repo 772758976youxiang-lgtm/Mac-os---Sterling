@@ -34,6 +34,7 @@ import { deriveEventMessage, foldSurface } from '@deepseek-ai/dsh-session/surfac
 import type {
   ApiProxy, ClientRequest, ClientResponse, HistoryEntry, HostFrame, MuxFrame, RpcReceipt,
   ModelProviderGroup, ModelSelection, RpcRequest, RpcResponse, RpcResult, ServerRequest, ServerResponse, SessionSummary,
+  ScheduleRuleView, ScheduledTaskView,
   ToolCallView, ToolEventView, ToolResultView, WorkspaceId, WorkspaceView,
 } from './api.ts'
 import type { RequestPayload, ResponseValue, RpcMethodMap } from '@deepseek-ai/dsh-host-apiproxy/api'
@@ -86,6 +87,11 @@ const MARKDOWN_FIXTURE = [
 ].join('\n')
 
 const USER_MARKDOWN_LITERAL = '用户字面量：# 不渲染 `code` [link](https://example.com)'
+
+/** Settings address used by the fixture's versioned welcome acknowledgement. */
+const FIXTURE_ONBOARDING_SETTINGS_NAMESPACE = 'ui-onboarding'
+/** Welcome acknowledgement field exposed by the fixture settings descriptor. */
+const FIXTURE_WELCOME_NOTICE_FIELD = 'welcomeNoticeVersion'
 
 /**
  * SGR wrapper for the terminal output sample below: authoring the escapes as
@@ -1517,6 +1523,19 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     { sessionId: sid('fx-beta'), updatedAt: Date.now() - 60_000, running: false, blank: false, parentSessionId: sid('fx-alpha'), cwd: '/tmp/fixture' },
     { sessionId: sid('fx-gamma'), updatedAt: Date.now() - 120_000, running: false, blank: false, cwd: '/tmp/fixture' },
   ]
+  let nextSchedule = 3
+  const schedules: ScheduledTaskView[] = options.empty ? [] : [
+    {
+      sessionId: sid('fx-alpha'), id: 'fx-schedule-1', prompt: '整理今天的项目进展并列出明日优先事项',
+      scheduledAt: new Date(Date.now() + 75 * 60_000).toISOString(), state: 'scheduled',
+      deliveryMode: 'session-local', kind: 'at',
+    },
+    {
+      sessionId: sid('fx-gamma'), id: 'fx-schedule-2', prompt: '检查待处理问题并生成简短摘要',
+      scheduledAt: new Date(Date.now() + 24 * 60 * 60_000).toISOString(), state: 'scheduled',
+      deliveryMode: 'session-local', kind: 'every', everySeconds: 86_400,
+    },
+  ]
   const logs = new Map<SessionId, SessionEvent[]>([[sid('fx-alpha'), buildAlphaLog()]])
   const modelSelections = new Map<SessionId, ModelSelection>(sessions.map(session => [
     session.sessionId,
@@ -1532,6 +1551,8 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     // DeepSeek route so unrelated GUI journeys do not enter first-run setup.
     ['DEEPSEEK_API_KEY', true],
   ])
+  let fixtureWelcomeNoticeVersion: string | undefined
+  let fixtureWelcomeNoticeRevision = 0
   /**
    * Preset compositions the fixture serves. Held as state rather than
    * constants so the settings editor's save and delete are exercisable: the
@@ -2174,6 +2195,32 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       replays.set(id, { timer: setTimeout(tick, 80), finish })
     }
     replays.set(id, { timer: setTimeout(tick, 80), finish })
+  }
+
+  const scheduleOwners = (): SessionId[] => sessions
+    .filter(session => session.parentSessionId === undefined)
+    .map(session => session.sessionId)
+
+  const taskFromRule = (sessionId: SessionId, id: string, rule: ScheduleRuleView): ScheduledTaskView => {
+    if (rule.everySeconds !== undefined) {
+      return {
+        sessionId, id, prompt: rule.prompt,
+        scheduledAt: new Date(Date.now() + rule.everySeconds * 1_000).toISOString(),
+        state: 'scheduled', deliveryMode: 'session-local', kind: 'every', everySeconds: rule.everySeconds,
+      }
+    }
+    if (rule.afterSeconds !== undefined) {
+      return {
+        sessionId, id, prompt: rule.prompt,
+        scheduledAt: new Date(Date.now() + rule.afterSeconds * 1_000).toISOString(),
+        state: 'scheduled', deliveryMode: 'session-local', kind: 'after', afterSeconds: rule.afterSeconds,
+      }
+    }
+    return {
+      sessionId, id, prompt: rule.prompt,
+      scheduledAt: rule.at ?? new Date(Date.now() + 60_000).toISOString(),
+      state: 'scheduled', deliveryMode: 'session-local', kind: 'at',
+    }
   }
 
   const api: ApiProxy = {
@@ -2893,20 +2940,31 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       },
     },
     settings: {
-      // Only the resolved DeepSeek address needed by first-run readiness is
-      // represented here. Fixture-backed journeys do not open its Models
-      // editor; real schema-driven forms ride the HTTP transport.
+      // Fixture-backed journeys need the DeepSeek readiness address and the
+      // versioned acknowledgement that releases the initial welcome notice.
       describe: request => ok(request, {
         writable: true,
         hasDocument: true,
-        namespaces: [{
-          ns: 'llm-deepseek',
-          schema: {},
-          value: { apiKeyEnv: 'DEEPSEEK_API_KEY' },
-          applies: 'live',
-          secrets: [{ path: ['apiKey'], set: false }],
-          revision: 0,
-        }],
+        namespaces: [
+          {
+            ns: 'llm-deepseek',
+            schema: {},
+            value: { apiKeyEnv: 'DEEPSEEK_API_KEY' },
+            applies: 'live',
+            secrets: [{ path: ['apiKey'], set: false }],
+            revision: 0,
+          },
+          {
+            ns: FIXTURE_ONBOARDING_SETTINGS_NAMESPACE,
+            schema: {},
+            value: fixtureWelcomeNoticeVersion === undefined
+              ? {}
+              : { [FIXTURE_WELCOME_NOTICE_FIELD]: fixtureWelcomeNoticeVersion },
+            applies: 'live',
+            secrets: [],
+            revision: fixtureWelcomeNoticeRevision,
+          },
+        ],
       }),
       // Native opens are deterministic no-op successes in this fixture, as is host.openPath.
       openDocument: request => ok(request, { opened: true as const }),
@@ -2920,11 +2978,34 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         message: 'fixture: the minimal readiness settings descriptor is read-only',
         details: { ns: request.payload.ns },
       }),
-      mutate: request => err(request, {
-        code: 'settings-rejected',
-        message: 'fixture: no settings namespaces are registered',
-        details: { ns: request.payload.ns },
-      }),
+      mutate: (request) => {
+        const { ns, ops } = request.payload
+        const [op] = ops
+        if (
+          ns !== FIXTURE_ONBOARDING_SETTINGS_NAMESPACE
+          || ops.length !== 1
+          || op?.op !== 'set'
+          || op.path.length !== 1
+          || op.path[0] !== FIXTURE_WELCOME_NOTICE_FIELD
+          || typeof op.value !== 'string'
+        ) {
+          return err(request, {
+            code: 'settings-rejected',
+            message: 'fixture: only the welcome acknowledgement can be saved',
+            details: { ns },
+          })
+        }
+        fixtureWelcomeNoticeVersion = op.value
+        fixtureWelcomeNoticeRevision++
+        return ok(request, {
+          ns: FIXTURE_ONBOARDING_SETTINGS_NAMESPACE,
+          schema: {},
+          value: { [FIXTURE_WELCOME_NOTICE_FIELD]: fixtureWelcomeNoticeVersion },
+          applies: 'live' as const,
+          secrets: [],
+          revision: fixtureWelcomeNoticeRevision,
+        })
+      },
     },
     credentials: {
       describe: request => ok(request, {
@@ -2961,6 +3042,46 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       discoverModels: request => ok(request, {
         models: fixtureModelGroups().flatMap(group => group.models.map(model => ({ id: model.id, name: model.name }))),
       }),
+    },
+    schedules: {
+      list: request => ok(request, {
+        ownerSessionIds: scheduleOwners(),
+        items: [...schedules].sort((left, right) => left.scheduledAt.localeCompare(right.scheduledAt)),
+      }),
+      create: (request) => {
+        const { sessionId, rule } = request.payload
+        if (!scheduleOwners().includes(sessionId)) {
+          return ok(request, { ok: false as const, error: {
+            code: 'schedule-owner-unavailable', message: `no live root session ${sessionId}`, operation: 'create' as const,
+          } })
+        }
+        const task = taskFromRule(sessionId, `fx-schedule-${nextSchedule++}`, rule)
+        schedules.push(task)
+        return ok(request, { ok: true as const, task })
+      },
+      update: (request) => {
+        const index = schedules.findIndex(task => task.sessionId === request.payload.sessionId && task.id === request.payload.id)
+        if (index < 0) {
+          return ok(request, { ok: false as const, error: {
+            code: 'schedule-not-found', message: `no schedule ${request.payload.id}`, operation: 'update' as const,
+            id: request.payload.id,
+          } })
+        }
+        const task = taskFromRule(request.payload.sessionId, `fx-schedule-${nextSchedule++}`, request.payload.rule)
+        schedules.splice(index, 1, task)
+        return ok(request, { ok: true as const, task })
+      },
+      delete: (request) => {
+        const index = schedules.findIndex(task => task.sessionId === request.payload.sessionId && task.id === request.payload.id)
+        if (index < 0) {
+          return ok(request, { ok: false as const, error: {
+            code: 'schedule-not-found', message: `no schedule ${request.payload.id}`, operation: 'delete' as const,
+            id: request.payload.id,
+          } })
+        }
+        schedules.splice(index, 1)
+        return ok(request, { ok: true as const, deleted: true as const })
+      },
     },
     respond(message: ClientResponse): Promise<RpcReceipt> {
       // Same routing discipline as the host: rpcId first, then the payload's
@@ -3129,6 +3250,10 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'llm.providers': return this.api.llm.providers(request)
       case 'llm.models': return this.api.llm.models(request)
       case 'llm.discoverModels': return this.api.llm.discoverModels(request, signal)
+      case 'schedule.list': return this.api.schedules.list(request)
+      case 'schedule.create': return this.api.schedules.create(request)
+      case 'schedule.update': return this.api.schedules.update(request)
+      case 'schedule.delete': return this.api.schedules.delete(request)
     }
   }
 

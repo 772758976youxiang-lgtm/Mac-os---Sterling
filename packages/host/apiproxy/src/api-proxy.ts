@@ -40,7 +40,7 @@ import type {
   ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
-  WorkspaceId, WorkspaceView,
+  WorkspaceId, WorkspaceView, ScheduleActionError, ScheduleRuleView, ScheduledTaskView,
 } from './api/index.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
@@ -83,6 +83,8 @@ import type { SettingsDescriptor, SettingsNamespace, SettingsPathOp } from '@dee
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 // Value edge: the rename impl narrows the title service's validation failure; the import also resolves `ctx.get('sessionTitle')`.
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
+import { ScheduleId } from '@deepseek-ai/dsh-schedule'
+import type { ScheduleRuleInput, ScheduleView } from '@deepseek-ai/dsh-schedule'
 import type { CallId } from '@deepseek-ai/dsh-llm/brand'
 import type { ScopeKey } from '@deepseek-ai/dsh-scope'
 import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-approval'
@@ -2052,6 +2054,58 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return ok(request, namespaceView(descriptor))
   }
 
+  /** Map a browser rule onto the Schedule service's shared input vocabulary. */
+  function scheduleRule(rule: ScheduleRuleView): ScheduleRuleInput {
+    return {
+      prompt: rule.prompt,
+      ...rule.afterSeconds === undefined ? {} : { afterSeconds: rule.afterSeconds },
+      ...rule.at === undefined ? {} : { at: rule.at },
+      ...rule.everySeconds === undefined ? {} : { everySeconds: rule.everySeconds },
+    }
+  }
+
+  /** Add the owner identity to one detached Schedule view. */
+  function scheduledTask(sessionId: SessionId, view: ScheduleView): ScheduledTaskView {
+    return { sessionId, ...view }
+  }
+
+  /** Normalize a contained Schedule rejection for the browser. */
+  function scheduleActionError(value: {
+    code: string
+    message?: string
+    operation?: string
+    id?: string
+  }): ScheduleActionError {
+    const operation = value.operation as ScheduleActionError['operation'] | undefined
+    return {
+      code: value.code,
+      message: value.message ?? 'The scheduled task no longer exists.',
+      ...operation === undefined
+        ? {}
+        : { operation },
+      ...value.id === undefined ? {} : { id: value.id },
+    }
+  }
+
+  /** Resolve or resume one root owner and verify that Schedule attached to it. */
+  async function scheduleAgent(
+    request: RpcRequest<unknown>,
+    sessionId: SessionId,
+  ): Promise<{ agent: Agent } | { refused: RpcResponse<never> }> {
+    const found = await agentFor(sessionId)
+    if ('error' in found) return { refused: err(request, found.error) }
+    if (!ctx.schedule.owns(found.agent)) {
+      return {
+        refused: err(request, {
+          code: 'internal',
+          message: `schedule is unavailable for session "${sessionId}"`,
+          details: {},
+        }),
+      }
+    }
+    return { agent: found.agent }
+  }
+
   return {
     sessions: {
       // Attached sessions summarize from memory; persisted-but-unattached (cold)
@@ -3429,6 +3483,62 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { settingsNs, ...baseURL === undefined ? {} : { baseURL } },
           })
         }
+      },
+    },
+
+    schedules: {
+      async list(request) {
+        const owners = ctx.schedule.owners()
+        const rows = await Promise.all(owners.map(async agent => ({
+          agent,
+          value: await ctx.schedule.list(agent),
+        })))
+        const items: ScheduledTaskView[] = []
+        for (const row of rows) {
+          if (!Array.isArray(row.value)) {
+            return err(request, { code: 'internal', message: row.value.message, details: {} })
+          }
+          items.push(...row.value.map(view => scheduledTask(row.agent.id, view)))
+        }
+        items.sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt))
+        return ok(request, {
+          ownerSessionIds: owners.map(agent => agent.id),
+          items,
+        })
+      },
+
+      async create(request) {
+        const found = await scheduleAgent(request, request.payload.sessionId)
+        if ('refused' in found) return found.refused
+        const result = await ctx.schedule.create(found.agent, scheduleRule(request.payload.rule))
+        return 'deliveryMode' in result
+          ? ok(request, { ok: true, task: scheduledTask(found.agent.id, result) })
+          : ok(request, { ok: false, error: scheduleActionError(result) })
+      },
+
+      async update(request) {
+        const found = await scheduleAgent(request, request.payload.sessionId)
+        if ('refused' in found) return found.refused
+        const result = await ctx.schedule.update(
+          found.agent,
+          ScheduleId(request.payload.id),
+          scheduleRule(request.payload.rule),
+        )
+        return 'deliveryMode' in result
+          ? ok(request, { ok: true, task: scheduledTask(found.agent.id, result) })
+          : ok(request, { ok: false, error: scheduleActionError(result) })
+      },
+
+      async delete(request) {
+        const found = await scheduleAgent(request, request.payload.sessionId)
+        if ('refused' in found) return found.refused
+        const result = await ctx.schedule.delete(found.agent, ScheduleId(request.payload.id))
+        if ('deleted' in result) {
+          return result.deleted
+            ? ok(request, { ok: true, deleted: true })
+            : ok(request, { ok: false, error: scheduleActionError(result) })
+        }
+        return ok(request, { ok: false, error: scheduleActionError(result) })
       },
     },
 

@@ -126,7 +126,7 @@ export function renderDigestText(items: readonly DigestItem[], day: string): str
     '',
     item.response,
   ].join('\n'))
-  return [`DeepSeek Harness daily digest - ${day}`, '', ...sections].join('\n\n')
+  return [`Sterling Harness daily digest - ${day}`, '', ...sections].join('\n\n')
 }
 
 /** Format a minimal escaped HTML digest suitable for HTML-capable mail clients. */
@@ -137,7 +137,7 @@ export function renderDigestHtml(items: readonly DigestItem[], day: string): str
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
-  return `<h1>DeepSeek Harness daily digest - ${escape(day)}</h1>${items.map(item => (
+  return `<h1>Sterling Harness daily digest - ${escape(day)}</h1>${items.map(item => (
     `<article><h2>${escape(item.prompt)}</h2><p><strong>Session:</strong> ${escape(item.sessionId)}`
     + (item.scheduleId === undefined ? '' : ` · <strong>Schedule:</strong> ${escape(item.scheduleId)}`)
     + `</p><p>${escape(item.response).replaceAll('\n', '<br>')}</p></article>`

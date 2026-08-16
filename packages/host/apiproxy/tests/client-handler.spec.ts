@@ -28,6 +28,7 @@ function scriptedApi(overrides: {
   settings?: Partial<ApiProxy['settings']>
   credentials?: Partial<ApiProxy['credentials']>
   llm?: Partial<ApiProxy['llm']>
+  schedules?: Partial<ApiProxy['schedules']>
   respond?: ApiProxy['respond']
 } = {}): ApiProxy {
   async function *empty<F>(): AsyncGenerator<RpcRequest<F>> { /* no frames */ }
@@ -127,6 +128,13 @@ function scriptedApi(overrides: {
       models: r => ok(r, { groups: [], failures: [] }),
       discoverModels: err,
       ...overrides.llm,
+    },
+    schedules: {
+      list: r => ok(r, { ownerSessionIds: [], items: [] }),
+      create: err,
+      update: err,
+      delete: err,
+      ...overrides.schedules,
     },
     events: { mux: () => empty<MuxFrame>(), host: () => empty<HostFrame>(), ...overrides.events },
     respond: overrides.respond ?? (() => Promise.resolve({ accepted: false as const, reason: 'not-pending' as const })),
@@ -752,7 +760,12 @@ describe('config unary surface', () => {
       llm: {
         providers: record('llm.providers', r => ok(r, { providers: [providerRow] })),
         models: record('llm.models', r => ok(r, { groups: [group], failures: [] })),
-        discoverModels: record('llm.discoverModels', r => ok(r, { models: [{ id: 'acme-large', contextWindow: 65536 }] })),
+        discoverModels: record('llm.discoverModels', r => ok(r, {
+          models: [{
+            id: 'acme-large', contextWindow: 65536, inputModalities: ['text', 'image'],
+            reasoningEfforts: [{ id: 'low', wireValue: 'low' }, { id: 'high', wireValue: 'high' }],
+          }],
+        })),
       },
     })
     const c = client(api)
@@ -784,7 +797,13 @@ describe('config unary surface', () => {
       api: 'openai-completions',
       apiKey: 'probe-key',
     })
-    expect(discovered.result).toEqual({ ok: true, value: { models: [{ id: 'acme-large', contextWindow: 65536 }] } })
+    expect(discovered.result).toEqual({
+      ok: true,
+      value: { models: [{
+        id: 'acme-large', contextWindow: 65536, inputModalities: ['text', 'image'],
+        reasoningEfforts: [{ id: 'low', wireValue: 'low' }, { id: 'high', wireValue: 'high' }],
+      }] },
+    })
 
     expect(seen.map(call => call.method)).toEqual([
       'settings.describe', 'settings.openDocument', 'settings.update', 'settings.replace', 'settings.mutate',

@@ -250,7 +250,11 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
         <input
           className={styles['input']}
           type="password"
-          autoComplete="off"
+          name={`api-key-${route.length === 0 ? 'custom-provider' : route}`}
+          autoComplete="new-password"
+          data-1p-ignore="true"
+          data-lpignore="true"
+          data-form-type="other"
           value={keyDraft}
           placeholder={t('keyPlaceholder')}
           aria-label={t('keyInput')}

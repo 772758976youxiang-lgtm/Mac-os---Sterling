@@ -65,6 +65,9 @@ import {
 } from '../api/credentials.schema.ts'
 import { llmDiscoverModelsRequestSchema, llmModelsRequestSchema, llmProvidersRequestSchema } from '../api/llm.schema.ts'
 import {
+  scheduleCreateRequestSchema, scheduleDeleteRequestSchema, scheduleListRequestSchema, scheduleUpdateRequestSchema,
+} from '../api/schedules.schema.ts'
+import {
   subagentHistoryRequestSchema,
   subagentInterruptRequestSchema,
   subagentListRequestSchema,
@@ -140,6 +143,10 @@ const UNARY_ROUTES: UnaryRoutes = {
   'llm.providers': { schema: llmProvidersRequestSchema, invoke: (api, r) => api.llm.providers(r) },
   'llm.models': { schema: llmModelsRequestSchema, invoke: (api, r) => api.llm.models(r) },
   'llm.discoverModels': { schema: llmDiscoverModelsRequestSchema, invoke: (api, r, signal) => api.llm.discoverModels(r, signal) },
+  'schedule.list': { schema: scheduleListRequestSchema, invoke: (api, r) => api.schedules.list(r) },
+  'schedule.create': { schema: scheduleCreateRequestSchema, invoke: (api, r) => api.schedules.create(r) },
+  'schedule.update': { schema: scheduleUpdateRequestSchema, invoke: (api, r) => api.schedules.update(r) },
+  'schedule.delete': { schema: scheduleDeleteRequestSchema, invoke: (api, r) => api.schedules.delete(r) },
 }
 
 /** Route lookup that narrows an arbitrary path segment to a map key (single cast point for the string→key refinement). */

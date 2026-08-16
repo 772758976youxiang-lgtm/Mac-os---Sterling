@@ -32,6 +32,15 @@ import styles from './ModelsSection.module.css'
  */
 export type ModelDraft = DeepSeekModelDraft
 
+type InputMode = 'auto' | 'text' | 'image'
+
+/** Map a stored input declaration to the small set of UI choices. */
+function inputModeOf(model: ModelDraft): InputMode {
+  const value = model['input']
+  if (!Array.isArray(value) || value.length === 0) return 'auto'
+  return value.includes('image') ? 'image' : 'text'
+}
+
 /** A row's text field, or the empty string when unset or not a string. */
 function textOf(model: ModelDraft, key: string): string {
   const value = model[key]
@@ -143,13 +152,21 @@ function capacitySpelling(value: number | undefined): string {
   return value === undefined ? '' : formatCapacity(value)
 }
 
-/** Adopt a candidate, keeping whatever capacities the provider disclosed. */
+/** Adopt a candidate, keeping the capacities and capabilities discovery disclosed. */
 function adopt(candidate: DiscoveredModelView): ModelDraft {
   return {
     id: candidate.id,
     ...candidate.name === undefined ? {} : { name: candidate.name },
     ...candidate.contextWindow === undefined ? {} : { contextWindow: candidate.contextWindow },
     ...candidate.maxTokens === undefined ? {} : { maxTokens: candidate.maxTokens },
+    ...candidate.inputModalities === undefined ? {} : { input: [...candidate.inputModalities] },
+    ...candidate.reasoningEfforts === undefined
+      ? {}
+      : {
+        reasoningEfforts: Object.fromEntries(
+          candidate.reasoningEfforts.map(effort => [effort.id, effort.wireValue]),
+        ),
+      },
   }
 }
 
@@ -210,7 +227,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
     })
   }
 
-  const patch = (index: number, next: Record<string, string | number | undefined>): void => {
+  const patch = (index: number, next: Record<string, unknown>): void => {
     onChange(models.map((model, at) => {
       if (at !== index) return model
       // Rebuilt rather than spread over: an emptied optional field has to leave
@@ -417,6 +434,25 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                     onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
                   />
                 </label>
+                <label className={styles['modelField']}>
+                  <span className={styles['modelFieldLabel']}>{t('modelInput')}</span>
+                  <select
+                    className={`${styles['input']} ${styles['selectInput']}`}
+                    value={inputModeOf(model)}
+                    aria-label={`${t('modelInput')} ${index + 1}`}
+                    disabled={disabled}
+                    onChange={(event) => {
+                      const mode = event.target.value as InputMode
+                      patch(index, {
+                        input: mode === 'auto' ? undefined : mode === 'text' ? ['text'] : ['text', 'image'],
+                      })
+                    }}
+                  >
+                    <option value="auto">{t('modelInputAuto')}</option>
+                    <option value="text">{t('modelInputText')}</option>
+                    <option value="image">{t('modelInputImage')}</option>
+                  </select>
+                </label>
               </div>
             )
             : null}
@@ -454,10 +490,29 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                   checked={picked.has(candidate.id)}
                   onChange={() => { toggle(candidate.id) }}
                 />
-                {/* The id alone: it is the string adoption writes, and the
-                    capacities the endpoint reported are adopted with it and
-                    editable in the row that appears. */}
+                {/* The id is what adoption writes; disclosed capabilities ride
+                    with it and remain editable in the row that appears. */}
                 <span className={styles['candidateId']}>{candidate.id}</span>
+                <span className={styles['candidateMetaGroup']}>
+                  {candidate.inputModalities?.includes('image')
+                    ? <span className={styles['candidateMeta']}>{t('candidateImageInput')}</span>
+                    : candidate.inputModalities !== undefined
+                      ? <span className={styles['candidateMeta']}>{t('candidateTextInput')}</span>
+                      : null}
+                  {candidate.reasoningEfforts === undefined
+                    ? null
+                    : (
+                      <span
+                        className={styles['candidateMeta']}
+                        title={candidate.reasoningEfforts.map(effort => effort.id).join(', ')}
+                      >
+                        {t('candidateReasoningLevels').replace(
+                          '{count}',
+                          String(candidate.reasoningEfforts.length),
+                        )}
+                      </span>
+                    )}
+                </span>
               </label>
             </li>
           ))}

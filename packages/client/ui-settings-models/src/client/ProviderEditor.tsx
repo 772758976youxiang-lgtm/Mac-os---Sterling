@@ -364,7 +364,11 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
           <input
             className={styles['input']}
             type="password"
-            autoComplete="off"
+            name={`api-key-${props.provider}`}
+            autoComplete="new-password"
+            data-1p-ignore="true"
+            data-lpignore="true"
+            data-form-type="other"
             value={keyDraft}
             placeholder={keyPlaceholder}
             aria-label={t('keyInput')}

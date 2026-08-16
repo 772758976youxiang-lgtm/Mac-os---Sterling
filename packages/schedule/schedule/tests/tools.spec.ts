@@ -10,6 +10,7 @@ import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { registerScheduleTools } from '../src/tools.ts'
 import { runScheduleTransaction } from '../src/transaction.ts'
+import { ScheduleService } from '../src/service.ts'
 
 const signal = new AbortController().signal
 const contexts: Context[] = []
@@ -19,6 +20,7 @@ interface ToolHarness {
   readonly agent: Agent
   readonly flushes: { count: number; outcomes: Array<'resolve' | 'reject' | Promise<'resolve' | 'reject'>> }
   readonly changes: { count: number }
+  readonly schedule: ScheduleService
   readonly disposeTools: () => void
 }
 
@@ -60,8 +62,10 @@ async function harness(withPersistence = true): Promise<ToolHarness> {
     })
   }
   const changes = { count: 0 }
-  const disposeTools = registerScheduleTools(ctx, ctx, agent, () => { changes.count += 1 })
-  return { ctx, agent, flushes, changes, disposeTools }
+  const schedule = new ScheduleService(ctx)
+  schedule.attach(agent, () => { changes.count += 1 })
+  const disposeTools = registerScheduleTools(ctx, ctx, agent, schedule)
+  return { ctx, agent, flushes, changes, schedule, disposeTools }
 }
 
 async function execute(
@@ -134,7 +138,7 @@ describe('Schedule tool protocol', () => {
     test.disposeTools()
     const disposeConflict = test.ctx.tools.register(list)
 
-    expect(() => registerScheduleTools(test.ctx, test.ctx, test.agent, () => {})).toThrow()
+    expect(() => registerScheduleTools(test.ctx, test.ctx, test.agent, test.schedule)).toThrow()
     expect(test.ctx.tools.get('schedule_create')).toBeUndefined()
     expect(test.ctx.tools.get('schedule_list')).toBe(list)
     expect(test.ctx.tools.get('schedule_delete')).toBeUndefined()
@@ -195,6 +199,27 @@ describe('Schedule tool protocol', () => {
 
     expect(value(await execute(test, 'schedule_create', { prompt: 'next', after_seconds: 1 })))
       .toMatchObject({ id: 'schedule-2' })
+  })
+
+  it('replaces an active reminder with a new durable id in one managed transaction', async () => {
+    const test = await harness()
+    const created = await test.schedule.create(test.agent, { prompt: 'old task', afterSeconds: 60 })
+    expect(created).toMatchObject({ id: 'schedule-1', prompt: 'old task' })
+
+    const updated = await test.schedule.update(test.agent, 'schedule-1' as never, {
+      prompt: 'new task', everySeconds: 300,
+    })
+
+    expect(updated).toMatchObject({
+      id: 'schedule-2', prompt: 'new task', kind: 'every', everySeconds: 300,
+    })
+    expect(await test.schedule.list(test.agent)).toEqual([
+      expect.objectContaining({ id: 'schedule-2', prompt: 'new task' }),
+    ])
+    expect(test.agent.session.events
+      .filter(event => event.type === 'schedule/change')
+      .map(event => event.data.operation)).toEqual(['create', 'delete', 'create'])
+    expect(test.flushes.count).toBe(5)
   })
 
   it('rejects an empty or padded delete id before persistence', async () => {
@@ -325,11 +350,12 @@ describe('Schedule tool protocol', () => {
     const test = await harness()
     test.disposeTools()
     let calls = 0
-    const dispose = registerScheduleTools(test.ctx, test.ctx, test.agent, () => {
+    test.schedule.attach(test.agent, () => {
       calls += 1
       if (calls === 1) throw new Error('observer failed')
       throw 'observer failed again'
     })
+    const dispose = registerScheduleTools(test.ctx, test.ctx, test.agent, test.schedule)
     expect(value(await execute(test, 'schedule_create', { prompt: 'still committed', after_seconds: 1 })))
       .toMatchObject({ id: 'schedule-1', state: 'scheduled' })
     expect(value(await execute(test, 'schedule_delete', { id: 'schedule-1' })))

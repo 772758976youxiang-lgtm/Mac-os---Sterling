@@ -8,6 +8,7 @@
  * `settings/document-updated` owner events.
  */
 
+import type { LlmDiscoveredReasoningEffort, ModelModality } from '@deepseek-ai/dsh-llm'
 import type { RpcRequest, RpcResponse } from './rpc.ts'
 import type { ModelCatalogFailure, ModelProviderGroup } from './sessions.ts'
 
@@ -86,4 +87,8 @@ export interface DiscoveredModelView {
   contextWindow?: number
   /** Maximum output tokens, when disclosed. */
   maxTokens?: number
+  /** Accepted input modalities when the discovery source explicitly discloses them. */
+  inputModalities?: readonly ModelModality[]
+  /** Selectable reasoning efforts and provider wire values, when disclosed. */
+  reasoningEfforts?: readonly LlmDiscoveredReasoningEffort[]
 }

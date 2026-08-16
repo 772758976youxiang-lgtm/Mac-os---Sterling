@@ -49,6 +49,49 @@ const MODALITY_GATE: Record<PiAiModality, true> = {
 export const MODALITIES = Object.keys(MODALITY_GATE) as readonly PiAiModality[]
 
 /**
+ * Model ids whose input capability is known even when the installed pi-ai
+ * catalog has not caught up yet. These are exact ids rather than name-based
+ * heuristics: an arbitrary gateway model must keep the conservative
+ * text-only default until its deployment declares otherwise.
+ */
+const KNOWN_MODEL_INPUTS: ReadonlyMap<string, readonly PiAiModality[]> = new Map([
+  ['qwen3.7-flash', ['text', 'image']],
+  ['qwen3.7-flash-2026-07-15', ['text', 'image']],
+])
+
+/** Exact reasoning corrections for models newer than the installed catalog. */
+const KNOWN_MODEL_REASONING_EFFORTS: ReadonlyMap<string, PiAiReasoningEfforts> = new Map([
+  ['qwen3.7-flash', { off: 'none', high: 'high' }],
+  ['qwen3.7-flash-2026-07-15', { off: 'none', high: 'high' }],
+])
+
+/** Exact request dialect corrections paired with the capability facts above. */
+const KNOWN_MODEL_COMPAT: ReadonlyMap<string, PiAiCompatProfile> = new Map([
+  ['qwen3.7-flash', { thinkingFormat: 'qwen', supportsReasoningEffort: false }],
+  ['qwen3.7-flash-2026-07-15', { thinkingFormat: 'qwen', supportsReasoningEffort: false }],
+])
+
+/**
+ * Return a built-in capability correction for one model id.
+ * @param modelId - provider model id as configured by the deployment.
+ * @returns the known input modalities, or `undefined` when no correction exists.
+ */
+export function knownModelInput(modelId: string): Model<Api>['input'] | undefined {
+  const input = KNOWN_MODEL_INPUTS.get(modelId.toLowerCase())
+  return input === undefined ? undefined : [...input]
+}
+
+/**
+ * Return a detached exact reasoning correction for one model id.
+ * @param modelId - provider model id as configured by the deployment.
+ * @returns the known reasoning effort map, or `undefined` when no correction exists.
+ */
+export function knownModelReasoningEfforts(modelId: string): PiAiReasoningEfforts | undefined {
+  const efforts = KNOWN_MODEL_REASONING_EFFORTS.get(modelId.toLowerCase())
+  return efforts === undefined ? undefined : { ...efforts }
+}
+
+/**
  * One entry's modality list, or `undefined` when it states no answer. Absent
  * and empty mean the same thing — `[]` describes a model that accepts nothing
  * and could serve no request — which is what makes an entry naming a catalog
@@ -318,9 +361,12 @@ function resolveModelReasoning(
   entry: PiAiModelProfile,
   base: Model<Api> | undefined,
 ): ModelReasoning {
-  const efforts = entry.reasoningEfforts
+  const efforts = entry.reasoningEfforts === undefined
+    ? knownModelReasoningEfforts(entry.id)
+    : entry.reasoningEfforts
   if (efforts === undefined) {
-    // Reasoning rides the installed entry or is absent: a bare capability flag
+    // Reasoning rides the installed entry or is absent after exact corrections:
+    // a bare capability flag
     // would make pi-ai advertise effort levels with no `thinkingLevelMap` to
     // spell them, and no listing endpoint reports a model's reasoning
     // protocol. The entry's map (when any) arrives through the `...base`
@@ -393,8 +439,11 @@ function resolveModelCompat(
   base: Model<Api> | undefined,
   api: string,
 ): { compat: OpenAICompletionsCompat } | Record<string, never> {
-  const thinkingFormat = entry.compat?.thinkingFormat ?? route?.thinkingFormat
-  const supportsReasoningEffort = entry.compat?.supportsReasoningEffort ?? route?.supportsReasoningEffort
+  const correction = KNOWN_MODEL_COMPAT.get(entry.id.toLowerCase())
+  const thinkingFormat = entry.compat?.thinkingFormat ?? route?.thinkingFormat ?? correction?.thinkingFormat
+  const supportsReasoningEffort = entry.compat?.supportsReasoningEffort
+    ?? route?.supportsReasoningEffort
+    ?? correction?.supportsReasoningEffort
   if (thinkingFormat === undefined && supportsReasoningEffort === undefined) return {}
   if (api !== 'openai-completions') {
     if (entry.compat?.thinkingFormat !== undefined || entry.compat?.supportsReasoningEffort !== undefined) {
@@ -534,7 +583,7 @@ export function resolveRouteModels(request: RouteCatalogRequest): RouteCatalog {
       // Image routes are image-edit capable by protocol. A hand-declared
       // route otherwise inherits the generic text-only fallback and the host
       // would switch an attached-image turn to its separate vision fallback.
-      input: declaredInput(entry.input) ?? base?.input
+      input: declaredInput(entry.input) ?? knownModelInput(entry.id) ?? base?.input
         ?? (api === OPENAI_IMAGE_GENERATIONS_API ? ['text', 'image'] : [...request.defaultInput]),
       cost: base?.cost ?? NO_COST,
       contextWindow,

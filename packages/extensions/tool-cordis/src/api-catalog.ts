@@ -3283,7 +3283,11 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmDiscoveredModel',
-    declaration: 'export interface LlmDiscoveredModel {\n    id: string;\n    name?: string;\n    contextWindow?: number;\n    maxTokens?: number;\n}',
+    declaration: 'export interface LlmDiscoveredModel {\n    id: string;\n    name?: string;\n    contextWindow?: number;\n    maxTokens?: number;\n    inputModalities?: readonly ModelModality[];\n    reasoningEfforts?: readonly LlmDiscoveredReasoningEffort[];\n}',
+  },
+  {
+    name: 'LlmDiscoveredReasoningEffort',
+    declaration: 'export interface LlmDiscoveredReasoningEffort {\n    id: string;\n    wireValue: string | null;\n}',
   },
   {
     name: 'LlmFailure',

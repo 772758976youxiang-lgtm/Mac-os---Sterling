@@ -7,6 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import { ScheduleRuntime } from './runtime.ts'
+import { ScheduleService } from './service.ts'
 import { registerScheduleTools } from './tools.ts'
 
 export type * from './types.ts'
@@ -28,6 +29,7 @@ export {
   scheduleView,
 } from './domain.ts'
 export { registerScheduleTools } from './tools.ts'
+export { ScheduleService, validateScheduleRule } from './service.ts'
 
 /** Cordis function-plugin name. */
 export const name = 'schedule'
@@ -38,6 +40,7 @@ type OwnerCleanup = () => void | Promise<void>
 
 /** Install Schedule only for root agents published after this plugin loads. */
 export function apply(ctx: Context): void {
+  const schedule = new ScheduleService(ctx)
   const runtimes = new Map<Agent, OwnerCleanup>()
   let stopping = false
 
@@ -46,7 +49,8 @@ export function apply(ctx: Context): void {
       if (stopping || runtimes.has(agent) || !ctx.agents.roots().includes(agent)) return
       const runtime = new ScheduleRuntime(ctx, agent)
       const cleanup: OwnerCleanup = agent.ctx.effect(() => {
-        const disposeTools = registerScheduleTools(ctx, agent.ctx, agent, () => { runtime.requestDrive() })
+        const detach = schedule.attach(agent, () => { runtime.requestDrive() })
+        const disposeTools = registerScheduleTools(ctx, agent.ctx, agent, schedule)
         const stopStatus = agent.ctx.on('agent/status', ({ status }) => {
           if (status === 'idle' && agent.session.events.some(event => event.type === 'schedule/change')) {
             runtime.requestDrive()
@@ -56,6 +60,7 @@ export function apply(ctx: Context): void {
         return async () => {
           stopStatus()
           disposeTools()
+          detach()
           try {
             await runtime.dispose()
           } finally {

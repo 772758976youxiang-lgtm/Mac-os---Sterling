@@ -239,6 +239,48 @@ describe('hand-declared providers', () => {
     expect(inputOf('anthropic', vision.id)).toEqual(vision.input)
   })
 
+  it('recognizes the known multimodal qwen3.7-flash model before catalog fallback', async () => {
+    const config: LlmPiAi.Config = {
+      providers: {
+        'qwen-gateway': {
+          api: 'openai-completions',
+          baseURL: 'https://qwen.example/v1',
+          models: [{ id: 'qwen3.7-flash' }, { id: 'QWEN3.7-FLASH' }],
+        },
+        'qwen-text-gateway': {
+          api: 'openai-completions',
+          baseURL: 'https://qwen-text.example/v1',
+          models: [{ id: 'qwen3.7-flash', input: ['text'] }],
+        },
+      },
+    }
+    const resolved = resolveProfiles(config.providers ?? {})
+    const inputOf = (route: string, id: string): readonly string[] | undefined =>
+      resolved.get(route)?.piProvider.getModels().find(model => model.id === id)?.input
+
+    expect(inputOf('qwen-gateway', 'qwen3.7-flash')).toEqual(['text', 'image'])
+    expect(inputOf('qwen-gateway', 'QWEN3.7-FLASH')).toEqual(['text', 'image'])
+    // An explicit deployment declaration remains authoritative over the
+    // built-in correction.
+    expect(inputOf('qwen-text-gateway', 'qwen3.7-flash')).toEqual(['text'])
+    const qwen = resolved.get('qwen-gateway')?.piProvider.getModels()
+      .find(model => model.id === 'qwen3.7-flash')
+    if (qwen === undefined) throw new Error('the corrected qwen model vanished')
+    expect(getSupportedThinkingLevels(qwen)).toEqual(['off', 'high'])
+    expect(qwen.compat).toMatchObject({ thinkingFormat: 'qwen', supportsReasoningEffort: false })
+
+    const ctx = await harness(config)
+    await expect(ctx.llm.resolveModelInfo('qwen-gateway', 'qwen3.7-flash')).resolves.toMatchObject({
+      inputModalities: ['text', 'image'],
+      reasoning: {
+        efforts: [
+          { id: 'off', name: 'Off' },
+          { id: 'high', name: 'High' },
+        ],
+      },
+    })
+  })
+
   it('carries a written modality declaration all the way to the seam’s model metadata', async () => {
     // The resolver-level cases above cannot see a break between the settings
     // document and `LlmModelInfo`, so each rung is asserted once more through

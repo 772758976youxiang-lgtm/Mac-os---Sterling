@@ -8,30 +8,13 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
-import {
-  allocateScheduleId,
-  createAfterScheduleRecord,
-  createAtScheduleRecord,
-  createEveryScheduleRecord,
-  foldScheduleEvents,
-  MIN_EVERY_INTERVAL_SECONDS,
-  ScheduleId,
-  ScheduleInputError,
-  ScheduleLogError,
-  scheduleView,
-} from './domain.ts'
-import { flushSchedulePersistence } from './persistence.ts'
-import { runScheduleTransaction } from './transaction.ts'
+import { MIN_EVERY_INTERVAL_SECONDS, ScheduleId } from './domain.ts'
+import type { ScheduleService } from './service.ts'
 import type {
   AtInput,
-  PersistenceUncertainError,
   ScheduleCreateValue,
   ScheduleDeleteValue,
-  ScheduleId as ScheduleIdType,
-  InternalScheduleError,
   ScheduleListValue,
-  SchedulePersistenceOperation,
-  ScheduleRecord,
   ScheduleToolError,
 } from './types.ts'
 
@@ -173,82 +156,6 @@ function present(title: string, kind: 'read' | 'other', rawInput?: unknown): Gen
   return { card: 'generic', title, kind, ...rawInput === undefined ? {} : { rawInput } }
 }
 
-/** Stable error for failures not safe to expose. */
-function internalError(): InternalScheduleError {
-  return { code: 'internal_error', message: 'The schedule operation failed.' }
-}
-
-/** Placeholder the registry replaces with its canonical ABORTED result after body quiescence. */
-function cancellationPlaceholder(signal: AbortSignal): InternalScheduleError | undefined {
-  return signal.aborted ? internalError() : undefined
-}
-
-/** Serialize one operation, stopping a body whose caller cancelled before its FIFO turn. */
-function runCancellableScheduleTransaction<T>(
-  agent: Agent,
-  signal: AbortSignal,
-  task: () => Promise<T>,
-): Promise<T | InternalScheduleError> {
-  return runScheduleTransaction(agent, async () => {
-    const cancelled = cancellationPlaceholder(signal)
-    return cancelled ?? task()
-  })
-}
-
-/** Stable durable-log failure. */
-function corruptLogError(): ScheduleToolError {
-  return { code: 'corrupt_schedule_log', message: 'The session schedule log is corrupt.' }
-}
-
-/** Stable persistence uncertainty with the known operation identity. */
-function persistenceError(
-  operation: SchedulePersistenceOperation,
-  id?: ScheduleIdType,
-): PersistenceUncertainError {
-  return {
-    code: 'persistence_uncertain',
-    message: 'Schedule persistence is uncertain; retry with schedule_list before relying on this result.',
-    operation,
-    ...id === undefined ? {} : { id },
-  }
-}
-
-/** Translate one contained input failure to the closed tool union. */
-function inputError(error: ScheduleInputError): ScheduleToolError {
-  return { code: error.code, message: error.message }
-}
-
-/** Fold only after a successful preflight, mapping corruption to a stable value. */
-function foldForTool(agent: Agent): ReturnType<typeof foldScheduleEvents> | ScheduleToolError {
-  try {
-    return foldScheduleEvents(agent.session.events, agent.session.header.seedLength ?? 0)
-  } catch (error: unknown) {
-    return error instanceof ScheduleLogError ? corruptLogError() : internalError()
-  }
-}
-
-/** Whether a fold attempt produced an error rather than replay state. */
-function isToolError(
-  value: ReturnType<typeof foldScheduleEvents> | ScheduleToolError,
-): value is ScheduleToolError {
-  return 'code' in value
-}
-
-/** Require one persistence checkpoint without leaking the backend failure. */
-async function preflight(
-  rootCtx: Context,
-  agent: Agent,
-  operation: SchedulePersistenceOperation,
-  id?: ScheduleIdType,
-): Promise<PersistenceUncertainError | undefined> {
-  try {
-    await flushSchedulePersistence(rootCtx, agent.session)
-    return undefined
-  } catch {
-    return persistenceError(operation, id)
-  }
-}
-
 /** Validate the v1 selector constraints that the open parameter root cannot express. */
 function validateCreateArgs(args: {
   prompt: string
@@ -293,25 +200,16 @@ function validateCreateArgs(args: {
  * @param rootCtx - Global service context owning sessions and durability.
  * @param toolCtx - Exact agent-scoped context receiving the definitions.
  * @param agent - Exact live owner whose session the tools mutate.
- * @param onDurableChange - Called after every successful preflight and again after a create or actual delete barrier succeeds.
+ * @param schedule - Shared Schedule management service.
  * @returns Idempotent aggregate disposer for the three registrations.
  */
 export function registerScheduleTools(
-  rootCtx: Context,
+  _rootCtx: Context,
   toolCtx: Context,
   agent: Agent,
-  onDurableChange: () => void,
+  schedule: ScheduleService,
 ): () => void {
   const disposers: Array<() => void> = []
-
-  /** A projection observer cannot reverse a completed durability barrier. */
-  const notifyDurableChange = (): void => {
-    try {
-      onDurableChange()
-    } catch (error: unknown) {
-      rootCtx.logger.warn(`schedule: durable-change observer failed: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
 
   try {
     disposers.push(toolCtx.tools.register(defineTool({
@@ -349,49 +247,15 @@ export function registerScheduleTools(
       },
       output: { schema: CREATE_OUTPUT_SCHEMA, render: renderValue },
       async execute(args, exec): Promise<ScheduleCreateValue> {
-        if (exec.agent !== agent) return internalError()
+        if (exec.agent !== agent) return { code: 'internal_error', message: 'The schedule operation failed.' }
         const invalid = validateCreateArgs(args)
         if (invalid !== undefined) return invalid
-        return runCancellableScheduleTransaction(agent, exec.signal, async () => {
-          const uncertain = await preflight(rootCtx, agent, 'create')
-          if (uncertain !== undefined) return uncertain
-          notifyDurableChange()
-          const folded = foldForTool(agent)
-          if (isToolError(folded)) return folded
-          const id = allocateScheduleId(folded)
-          let record: ScheduleRecord
-          try {
-            if (args.at !== undefined) {
-              record = createAtScheduleRecord(id, args.prompt, args.at, Date.now())
-            } else if (args.after_seconds !== undefined) {
-              record = createAfterScheduleRecord(id, args.prompt, args.after_seconds, Date.now())
-            } else {
-              record = createEveryScheduleRecord(
-                id,
-                args.prompt,
-                args.every_seconds as number,
-                Date.now(),
-              )
-            }
-          } catch (error: unknown) {
-            return error instanceof ScheduleInputError ? inputError(error) : internalError()
-          }
-          const cancelledBeforeAppend = cancellationPlaceholder(exec.signal)
-          if (cancelledBeforeAppend !== undefined) return cancelledBeforeAppend
-          try {
-            agent.session.append('schedule/change', {
-              version: 1,
-              operation: 'create',
-              schedule: record,
-            })
-          } catch {
-            return internalError()
-          }
-          const barrier = await preflight(rootCtx, agent, 'create', id)
-          if (barrier !== undefined) return barrier
-          notifyDurableChange()
-          return scheduleView(record, Date.now())
-        })
+        return schedule.create(agent, {
+          prompt: args.prompt,
+          ...args.at === undefined ? {} : { at: args.at },
+          ...args.after_seconds === undefined ? {} : { afterSeconds: args.after_seconds },
+          ...args.every_seconds === undefined ? {} : { everySeconds: args.every_seconds },
+        }, exec.signal)
       },
       presentCall: args => present('Create reminder', 'other', args.prompt),
     })))
@@ -402,16 +266,8 @@ export function registerScheduleTools(
       parameters: {},
       output: { schema: LIST_OUTPUT_SCHEMA, render: renderValue },
       async execute(_args, exec): Promise<ScheduleListValue> {
-        if (exec.agent !== agent) return internalError()
-        return runCancellableScheduleTransaction(agent, exec.signal, async () => {
-          const uncertain = await preflight(rootCtx, agent, 'list')
-          if (uncertain !== undefined) return uncertain
-          notifyDurableChange()
-          const folded = foldForTool(agent)
-          if (isToolError(folded)) return folded
-          const now = Date.now()
-          return folded.active.map(record => scheduleView(record, now))
-        })
+        if (exec.agent !== agent) return { code: 'internal_error', message: 'The schedule operation failed.' }
+        return schedule.list(agent, exec.signal)
       },
       presentCall: () => present('List reminders', 'read'),
     })))
@@ -428,28 +284,8 @@ export function registerScheduleTools(
           return { code: 'invalid_rule', message: 'schedule_delete id must be non-empty without surrounding whitespace.' }
         }
         const id = ScheduleId(args.id)
-        if (exec.agent !== agent) return internalError()
-        return runCancellableScheduleTransaction(agent, exec.signal, async () => {
-          const uncertain = await preflight(rootCtx, agent, 'delete', id)
-          if (uncertain !== undefined) return uncertain
-          notifyDurableChange()
-          const folded = foldForTool(agent)
-          if (isToolError(folded)) return folded
-          if (!folded.active.some(record => record.id === id)) {
-            return { id, deleted: false, code: 'schedule_not_found' }
-          }
-          const cancelledBeforeAppend = cancellationPlaceholder(exec.signal)
-          if (cancelledBeforeAppend !== undefined) return cancelledBeforeAppend
-          try {
-            agent.session.append('schedule/change', { version: 1, operation: 'delete', id })
-          } catch {
-            return internalError()
-          }
-          const barrier = await preflight(rootCtx, agent, 'delete', id)
-          if (barrier !== undefined) return barrier
-          notifyDurableChange()
-          return { id, deleted: true }
-        })
+        if (exec.agent !== agent) return { code: 'internal_error', message: 'The schedule operation failed.' }
+        return schedule.delete(agent, id, exec.signal)
       },
       presentCall: args => present('Delete reminder', 'other', args.id),
     })))

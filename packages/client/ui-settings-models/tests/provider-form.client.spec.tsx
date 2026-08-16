@@ -31,6 +31,11 @@ const PiAiConfig = Schema.object({
       name: Schema.string(),
       contextWindow: Schema.number(),
       maxTokens: Schema.number(),
+      input: Schema.array(Schema.union(['text', 'image'])),
+      reasoningEfforts: Schema.union([
+        Schema.const(false),
+        Schema.dict(Schema.union([Schema.string(), Schema.const(null)])),
+      ]),
     })),
     reasoning: Schema.union(['off', 'high']),
   })),
@@ -465,7 +470,20 @@ describe('endpoint interrogation', () => {
 
   it('adopts only the picked candidates, keeping a row the user already tuned', async () => {
     const discover = vi.fn(() => Promise.resolve(ok({
-      models: [{ id: 'kept', contextWindow: 999 }, { id: 'fresh', contextWindow: 4096, name: 'Fresh' }],
+      models: [{
+        id: 'kept',
+        contextWindow: 999,
+      }, {
+        id: 'fresh',
+        contextWindow: 4096,
+        name: 'Fresh',
+        inputModalities: ['text', 'image'],
+        reasoningEfforts: [
+          { id: 'off', wireValue: 'none' },
+          { id: 'low', wireValue: 'low' },
+          { id: 'high', wireValue: 'high' },
+        ],
+      }],
     })))
     const { mutate } = await mountSection({
       discover,
@@ -484,7 +502,13 @@ describe('endpoint interrogation', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops[0]?.value).toEqual([
       { id: 'kept', contextWindow: 111 },
-      { id: 'fresh', contextWindow: 4096, name: 'Fresh' },
+      {
+        id: 'fresh',
+        contextWindow: 4096,
+        name: 'Fresh',
+        input: ['text', 'image'],
+        reasoningEfforts: { off: 'none', low: 'low', high: 'high' },
+      },
     ])
   })
 
@@ -569,6 +593,42 @@ describe('endpoint interrogation', () => {
     expect(screen.queryByLabelText(`${en.modelContextWindow} 1`)).toBeNull()
   })
 
+  it('lets a model override automatic modality detection', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'vision' }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    const input = screen.getByLabelText(`${en.modelInput} 1`)
+    fireEvent.change(input, { target: { value: 'image' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'vision', input: ['text', 'image'] }])
+
+    cleanup()
+    const second = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'vision', input: ['text', 'image'] }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+    fireEvent.change(screen.getByLabelText(`${en.modelInput} 1`), { target: { value: 'text' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(second.mutate).toHaveBeenCalled() })
+    expect(firstMutate(second.mutate).ops[0]?.value).toEqual([{ id: 'vision', input: ['text'] }])
+
+    cleanup()
+    const third = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'vision', input: ['text'] }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+    fireEvent.change(screen.getByLabelText(`${en.modelInput} 1`), { target: { value: 'auto' } })
+    fireEvent.click(screen.getByText(en.apply))
+    await waitFor(() => { expect(third.mutate).toHaveBeenCalled() })
+    expect(firstMutate(third.mutate).ops[0]?.value).toEqual([{ id: 'vision' }])
+  })
+
   it('closes the picker without adopting anything on cancel', async () => {
     const discover = vi.fn(() => Promise.resolve(ok({ models: [{ id: 'fresh' }] })))
     const { mutate } = await mountSection({ discover })
@@ -606,6 +666,22 @@ describe('endpoint interrogation', () => {
 })
 
 describe('provider rows', () => {
+  it('isolates each provider key field from stored-password autofill', async () => {
+    await mountSection({
+      providers: { 'acme-gateway': { apiKeyEnv: 'ACME_GATEWAY_API_KEY', baseURL: 'https://acme.test/v1' } },
+      declaredRoutes: ['acme-gateway'],
+    })
+    openEditor('acme-gateway')
+
+    const key = screen.getByLabelText<HTMLInputElement>(en.keyInput)
+    expect(key.value).toBe('')
+    expect(key.name).toBe('api-key-acme-gateway')
+    expect(key.autocomplete).toBe('new-password')
+    expect(key.dataset['1pIgnore']).toBe('true')
+    expect(key.dataset['lpignore']).toBe('true')
+    expect(key.dataset['formType']).toBe('other')
+  })
+
   it('tags the routes the adapter declared, and only those', async () => {
     await mountSection({
       providers: {

@@ -124,7 +124,7 @@ export interface Config {
   timeZone?: string
   /** Sender address; defaults to `smtp.username`. */
   from?: string
-  /** Subject prefix; defaults to `DeepSeek Harness daily digest`. */
+  /** Subject prefix; defaults to `Sterling Harness daily digest`. */
   subject?: string
   /** Retry delay after a failed send; defaults to 15 minutes. */
   retryMinutes?: number
@@ -198,7 +198,7 @@ function resolveConfig(config: Config): ResolvedConfig {
     sendAt: config.sendAt,
     timeZone,
     from: config.from ?? config.smtp.username,
-    subject: config.subject ?? 'DeepSeek Harness daily digest',
+    subject: config.subject ?? 'Sterling Harness daily digest',
     retryMinutes,
   }
 }
