@@ -6,15 +6,18 @@ Local MCP-shaped image generation for DSH. It registers `mcp__image__generate_im
 
 The bridge searches configured providers for `gpt-image-2` by default. Set `provider` to pin a route, or `model` when the deployment uses another image model id. The bridge marks its one-shot call with the `image-generation` purpose, so the Image API accepts its explicit plugin prompt without treating ordinary injected context as a user prompt. Each call supplies `size` and `quality`, plus an optional separate-image count; these request controls override the corresponding route defaults without changing its response encoding. Generated images remain durable attachments: the text model receives only a completion summary, while the Web conversation renders a successful gallery without a redundant tool row.
 
-The same bridge registers `mcp__vision__analyze_image`. When the active model is text-only, it can call this tool to inspect the newest image in the user message; the bridge reads the durable attachment in the Host and sends it to the configured OpenAI-compatible Qwen endpoint. The default model is `qwen3.7-flash` at DashScope's compatible endpoint. The Web MCP management tab stores the API key through the credential service, so the key is never returned to the browser or written into the settings document.
+The same bridge registers `mcp__vision__analyze_image`. When the active model is text-only, it can call this tool to inspect the newest image in the user message. Configure the visual route directly in Plugins > Image understanding: the form accepts a custom Provider ID, display name, endpoint, API key, model ID, and one of `openai-completions`, `minimax-h3`, `openai-responses`, `anthropic-messages`, or `openai-image-generations`. MiniMax H3 uses its OpenAI-compatible Chat Completions dialect; Responses and Anthropic use their native message shapes. The image-generation protocol is listed for parity with model routes but cannot perform visual recognition. The key is kept in the credential store and image bytes are read from the durable attachment store only when the tool runs.
 
 ```yaml
 - id: mcp-image-generation
   name: '@deepseek-ai/dsh-mcp-image-generation'
   config:
-    visionApiKeyEnv: DASHSCOPE_API_KEY
-    visionModel: qwen3.7-flash
-    visionBaseURL: https://dashscope.aliyuncs.com/compatible-mode/v1
+    visionProvider: vision-gateway
+    visionDisplayName: Vision Gateway
+    visionBaseURL: https://gateway.example/v1
+    visionApi: openai-completions
+    visionApiKeyEnv: VISION_GATEWAY_API_KEY
+    visionModel: vision-model
 ```
 
 ```yaml
@@ -43,7 +46,7 @@ The stable tool schema is cacheable with the rest of the system prompt. Each too
 
 ### Image understanding
 
-`mcp__vision__analyze_image` receives a text prompt and automatically selects the latest user image. It returns Qwen's textual description or extraction result; source image bytes and the API key stay outside the model-visible tool result.
+`mcp__vision__analyze_image` receives a text prompt and automatically sends the latest user image to the configured custom provider. It returns the provider's textual description or extraction result; source image bytes and provider credentials stay outside the calling model's tool result.
 
 ## Known Limitations and Deferred Work
 

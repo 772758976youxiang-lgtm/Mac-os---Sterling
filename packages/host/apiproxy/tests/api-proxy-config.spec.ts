@@ -357,8 +357,12 @@ describe('settings domain', () => {
       enabled: z.boolean().default(false),
     }))
     ctx.settings.register(settingsNamespace('mcp-image-generation'), z.object({
-      visionApiKeyEnv: z.string().default('DASHSCOPE_API_KEY'),
-      visionModel: z.string().default('qwen3.7-flash'),
+      visionProvider: z.string().default(''),
+      visionDisplayName: z.string().default(''),
+      visionBaseURL: z.string().default(''),
+      visionApi: z.string().default('openai-completions'),
+      visionApiKeyEnv: z.string().default('STERLING_VISION_API_KEY'),
+      visionModel: z.string().default(''),
     }))
     const api = createApiProxy(ctx, DEFAULTS)
 
@@ -404,9 +408,20 @@ describe('settings domain', () => {
     expect(webSearch.value).toEqual({ baseURL: 'https://search.test/v1' })
     const vision = expectOk(await api.settings.mutate(request({
       ns: 'mcp-image-generation',
-      ops: [{ op: 'set', path: ['visionApiKeyEnv'], value: 'QWEN_API_KEY' }],
+      ops: [
+        { op: 'set', path: ['visionProvider'], value: 'acme-gateway' },
+        { op: 'set', path: ['visionBaseURL'], value: 'https://gateway.example/v1' },
+        { op: 'set', path: ['visionModel'], value: 'acme-vision' },
+      ],
     })))
-    expect(vision.value).toEqual({ visionApiKeyEnv: 'QWEN_API_KEY', visionModel: 'qwen3.7-flash' })
+    expect(vision.value).toEqual({
+      visionProvider: 'acme-gateway',
+      visionDisplayName: '',
+      visionBaseURL: 'https://gateway.example/v1',
+      visionApi: 'openai-completions',
+      visionApiKeyEnv: 'STERLING_VISION_API_KEY',
+      visionModel: 'acme-vision',
+    })
 
     for (const response of [
       await api.settings.update(request({ ns: 'some-other-plugin', patch: { secretPath: '/etc/shadow' } })),

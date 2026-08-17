@@ -4,6 +4,11 @@
   gap: 12px;
 }
 
+.full {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -41,16 +46,20 @@
   opacity: 0.55;
 }
 
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 14px;
+.selectInput {
+  appearance: auto;
+}
+
+.notice,
+.hint {
+  margin: 12px 0 0;
   color: var(--dsw-alias-label-tertiary);
-  font-family: var(--ds-font-family-code);
   font-size: 12px;
   line-height: 18px;
-  overflow-wrap: anywhere;
+}
+
+.notice {
+  color: var(--dsw-alias-label-secondary);
 }
 
 @media (max-width: 620px) {

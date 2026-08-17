@@ -19,8 +19,10 @@ export type PluginsSettingsLocaleKey =
   | 'emailDigestPasswordRef' | 'emailDigestPasswordRefHint' | 'emailDigestPassword' | 'emailDigestPasswordHint'
   | 'emailDigestPasswordSet' | 'emailDigestPasswordUnset'
   | 'emailDigestRecipients' | 'emailDigestRecipientsHint' | 'emailDigestFrom' | 'emailDigestFromHint'
-  | 'visionTitle' | 'visionDescription' | 'visionApiKeyRef' | 'visionApiKey' | 'visionApiKeyHint'
-  | 'visionConfigured' | 'visionNotConfigured' | 'visionModel' | 'visionBaseUrl'
+  | 'visionTitle' | 'visionDescription' | 'visionProvider' | 'visionDisplayName'
+  | 'visionBaseUrl' | 'visionApi' | 'visionApiKey' | 'visionApiKeyHint'
+  | 'visionConfigured' | 'visionNotConfigured' | 'visionModel'
+  | 'visionCustomRequired' | 'visionCustomHint'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -85,14 +87,18 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   emailDigestFrom: 'From address',
   emailDigestFromHint: 'Must be accepted by the SMTP provider.',
   visionTitle: 'Image understanding',
-  visionDescription: 'Uses Qwen3.7-Flash when a text model needs to inspect an image.',
-  visionApiKeyRef: 'API key reference',
-  visionApiKey: 'Qwen API key',
+  visionDescription: 'Uses a custom OpenAI-compatible provider when a text model needs to inspect an image.',
+  visionProvider: 'Provider ID',
+  visionDisplayName: 'Display name',
+  visionBaseUrl: 'API endpoint',
+  visionApi: 'API protocol',
+  visionApiKey: 'API key',
   visionApiKeyHint: 'Stored outside the settings file. Leave blank to keep the current key.',
   visionConfigured: 'A key is configured.',
-  visionNotConfigured: 'No key is configured; image understanding is unavailable until one is.',
-  visionModel: 'Model',
-  visionBaseUrl: 'Endpoint',
+  visionNotConfigured: 'No key is configured.',
+  visionModel: 'Model ID',
+  visionCustomRequired: 'Enter a valid Provider ID, API endpoint, and Model ID before saving.',
+  visionCustomHint: 'This provider sends image understanding requests using the selected API protocol.',
 }
 
 /** Simplified Chinese copy. */
@@ -158,12 +164,16 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   emailDigestFrom: '发件地址',
   emailDigestFromHint: '必须被 SMTP 服务商接受。',
   visionTitle: '视觉识别',
-  visionDescription: '文本模型需要查看图片时，使用 Qwen3.7-Flash 进行识别。',
-  visionApiKeyRef: 'API Key 引用',
-  visionApiKey: 'Qwen API Key',
-  visionApiKeyHint: '不写入设置文件。留空表示保持当前密钥。',
+  visionDescription: '文本模型需要查看图片时，使用自定义的 OpenAI 兼容提供方进行识别。',
+  visionProvider: 'Provider ID',
+  visionDisplayName: '显示名称',
+  visionBaseUrl: 'API 地址',
+  visionApi: 'API 协议',
+  visionApiKey: 'API 密钥',
+  visionApiKeyHint: '密钥写入凭据存储，不会保存到设置文件。留空表示保留当前密钥。',
   visionConfigured: '已配置密钥。',
-  visionNotConfigured: '尚未配置密钥；配置后才能使用视觉识别。',
-  visionModel: '模型',
-  visionBaseUrl: '接口地址',
+  visionNotConfigured: '尚未配置密钥。',
+  visionModel: '模型 ID',
+  visionCustomRequired: '请填写有效的 Provider ID、API 地址和模型 ID 后再保存。',
+  visionCustomHint: '视觉识别会根据所选 API 协议发送图片请求。',
 }

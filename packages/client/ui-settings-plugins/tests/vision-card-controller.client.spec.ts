@@ -1,64 +1,95 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VisionSettingsController } from '../src/client/vision-card-controller.ts'
-import type { VisionSettingsState } from '../src/client/vision-card-controller.ts'
 
-function scope() {
+function scope(value: {
+  visionProvider?: string
+  visionDisplayName?: string
+  visionBaseURL?: string
+  visionApi?: string
+  visionApiKeyEnv?: string
+  visionModel?: string
+} = {}) {
   let snapshot = {
     status: 'ready' as const,
-    value: {
-      visionApiKeyEnv: 'DASHSCOPE_API_KEY',
-      visionBaseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-      visionModel: 'qwen3.7-flash',
-    },
+    value,
     base: {}, user: {}, revision: 0, writable: true, mode: 'host' as const,
   }
   const listeners = new Set<() => void>()
   return {
     getSnapshot: () => snapshot,
     subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
-    set: vi.fn(async (field: string, value: unknown) => {
-      snapshot = { ...snapshot, value: { ...snapshot.value, [field]: value }, revision: snapshot.revision + 1 }
+    set: vi.fn(async (field: string, next: unknown) => {
+      snapshot = { ...snapshot, value: { ...snapshot.value, [field]: next }, revision: snapshot.revision + 1 }
       for (const listener of listeners) listener()
     }),
   }
 }
 
-describe('vision plugin settings controller', () => {
-  it('writes the API key only through credentials and keeps the draft write-only', async () => {
-    const settings = scope()
-    const credentials = {
-      describe: vi.fn().mockResolvedValue({ result: { ok: true, value: {
-        credentials: { DASHSCOPE_API_KEY: { configured: false, writable: true } },
-      } } }),
-      set: vi.fn().mockResolvedValue({ result: { ok: true, value: {} } }),
-    }
-    const controller = new VisionSettingsController(settings as never, { credentials } as never)
-    const face = controller.inject()
-    await vi.waitFor(() => { expect(credentials.describe).toHaveBeenCalled() })
+function credentials() {
+  return {
+    describe: vi.fn().mockResolvedValue({ result: { ok: true, value: { credentials: {} } } }),
+    set: vi.fn().mockResolvedValue({ result: { ok: true, value: { ref: 'ACME_GATEWAY_API_KEY' } } }),
+  }
+}
 
-    face.edit('apiKey', 'qwen-secret')
-    expect(face.hooks.visionSettings.getSnapshot().apiKeyDraft).toBe('qwen-secret')
+describe('vision plugin custom provider controller', () => {
+  it('stages and saves a custom provider with its API key', async () => {
+    const settings = scope()
+    const secret = credentials()
+    const controller = new VisionSettingsController(settings as never, { credentials: secret } as never)
+    const face = controller.inject()
+
+    face.edit('provider', 'acme-gateway')
+    face.edit('displayName', 'Acme Gateway')
+    face.edit('baseURL', 'https://gateway.example/v1')
+    face.edit('model', 'acme-vision')
+    face.edit('apiKey', 'secret-key')
+
+    expect(face.hooks.visionSettings.getSnapshot()).toMatchObject({
+      provider: 'acme-gateway', baseURL: 'https://gateway.example/v1', model: 'acme-vision',
+      dirty: true, invalid: false,
+    })
+
     face.save()
-    await vi.waitFor(() => { expect(credentials.set).toHaveBeenCalledWith({ ref: 'DASHSCOPE_API_KEY', value: 'qwen-secret' }) })
-    expect(settings.set).not.toHaveBeenCalledWith('visionApiKey', expect.anything())
+    await vi.waitFor(() => { expect(settings.set).toHaveBeenCalledWith('visionProvider', 'acme-gateway') })
+    await vi.waitFor(() => { expect(secret.set).toHaveBeenCalledWith({ ref: 'ACME_GATEWAY_API_KEY', value: 'secret-key' }) })
+    await vi.waitFor(() => { expect(face.hooks.visionSettings.getSnapshot().dirty).toBe(false) })
+    expect(settings.set).toHaveBeenCalledWith('visionDisplayName', 'Acme Gateway')
+    expect(settings.set).toHaveBeenCalledWith('visionBaseURL', 'https://gateway.example/v1')
+    expect(settings.set).toHaveBeenCalledWith('visionModel', 'acme-vision')
   })
 
-  it('stages a custom credential reference before saving', async () => {
+  it('accepts a host-style endpoint and normalizes it before saving', async () => {
     const settings = scope()
-    const credentials = {
-      describe: vi.fn().mockResolvedValue({ result: { ok: true, value: {
-        credentials: { QWEN_API_KEY: { configured: true, writable: true } },
-      } } }),
-      set: vi.fn().mockResolvedValue({ result: { ok: true, value: {} } }),
-    }
-    const controller = new VisionSettingsController(settings as never, { credentials } as never)
+    const controller = new VisionSettingsController(settings as never, { credentials: credentials() } as never)
     const face = controller.inject()
-    face.edit('apiKeyRef', 'QWEN_API_KEY')
-    face.edit('apiKey', 'new-key')
+
+    face.edit('provider', 'acme-gateway')
+    face.edit('baseURL', 'www.sdasd')
+    face.edit('model', 'acme-vision')
+
+    expect(face.hooks.visionSettings.getSnapshot()).toMatchObject({ dirty: true, invalid: false })
+
     face.save()
-    await vi.waitFor(() => { expect(settings.set).toHaveBeenCalledWith('visionApiKeyEnv', 'QWEN_API_KEY') })
-    await vi.waitFor(() => { expect(credentials.set).toHaveBeenCalledWith({ ref: 'QWEN_API_KEY', value: 'new-key' }) })
-    const state = face.hooks.visionSettings.getSnapshot() as VisionSettingsState
-    expect(state.apiKeyRef).toBe('QWEN_API_KEY')
+    await vi.waitFor(() => { expect(settings.set).toHaveBeenCalledWith('visionBaseURL', 'https://www.sdasd') })
+  })
+
+  it('blocks incomplete custom provider data', () => {
+    const controller = new VisionSettingsController(scope() as never, { credentials: credentials() } as never)
+    const face = controller.inject()
+
+    face.edit('provider', 'Acme Gateway')
+    face.edit('baseURL', 'https://')
+    face.edit('model', 'vision')
+
+    expect(face.hooks.visionSettings.getSnapshot()).toMatchObject({ dirty: true, invalid: true })
+  })
+
+  it('does not surface a legacy model without a custom provider', () => {
+    const controller = new VisionSettingsController(
+      scope({ visionModel: 'qwen3.7-flash' }) as never,
+      { credentials: credentials() } as never,
+    )
+    expect(controller.inject().hooks.visionSettings.getSnapshot()).toMatchObject({ provider: '', model: '' })
   })
 })

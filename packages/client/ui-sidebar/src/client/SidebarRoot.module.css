@@ -112,6 +112,7 @@
 
 .collapsed .toggle {
   order: -1;
+  position: relative;
 }
 
 /* Brand group (figma I133:7632): the full wordmark rides the text ink
@@ -155,19 +156,32 @@
   height: 36px;
 }
 
-/* Rail logo swap: collapsed, the toggle rests as the whale mark (brand ink,
-   no hover circle) and hovering reveals the panel icon — the expand
-   affordance (figma sidebar-hover flow). Expanded it is a plain panel icon. */
+/* Rail logo swap: collapsed, the toggle rests as the Sterling mark (brand
+   ink, no hover circle) and hovering reveals the panel icon. Both marks are
+   centered in the same 36px control so the inline display on the image cannot
+   push the panel icon beside it. */
+.collapsed .toggle .railFish,
+.collapsed .toggle .panelIcon {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  pointer-events: none;
+}
+
+.collapsed .toggle .railFish {
+  transition: opacity 120ms var(--ds-ease-in-out);
+}
+
 .collapsed .toggle .panelIcon {
   display: none;
 }
 
 .collapsed .toggle:hover .panelIcon {
-  display: inline;
+  display: block;
 }
 
 .collapsed .toggle:hover .railFish {
-  display: none;
+  opacity: 0;
 }
 
 /* Rail icons ride the primary ink (figma rail spec); expanded keeps the

@@ -87,12 +87,14 @@ function renderBash(state: Partial<BashCardState> = {}) {
 function renderVision(state: Partial<VisionSettingsState> = {}) {
   const store = createSnapshotStore<VisionSettingsState>({
     ...settled,
-    apiKeyRef: 'DASHSCOPE_API_KEY',
+    provider: 'vision',
+    displayName: 'Vision',
+    baseURL: 'https://vision.example/v1',
+    api: 'openai-completions',
+    model: 'vision-1',
     apiKeyDraft: '',
     apiKeyConfigured: false,
     apiKeyWritable: true,
-    model: 'qwen3.7-flash',
-    baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     ...state,
   })
   const actions = cardActions()
@@ -421,22 +423,26 @@ describe('WebSearchCard', () => {
 })
 
 describe('VisionCard', () => {
-  it('is an independent plugin card and stages its reference and key only when expanded', () => {
+  it('renders a custom provider form and stages fields only when expanded', () => {
     const actions = renderVision()
 
     expect(screen.getByText(en.visionTitle)).toBeTruthy()
-    expect(screen.queryByLabelText(en.visionApiKeyRef)).toBeNull()
+    expect(screen.queryByLabelText(en.visionProvider)).toBeNull()
 
     fireEvent.click(screen.getByText(en.visionTitle))
-    fireEvent.change(screen.getByLabelText(en.visionApiKeyRef), { target: { value: 'TEAM_QWEN_KEY' } })
-    fireEvent.change(screen.getByLabelText(en.visionApiKey), { target: { value: 'qwen-secret' } })
+    expect([...screen.getByLabelText(en.visionApi).querySelectorAll('option')].map(option => option.value)).toEqual([
+      'openai-completions', 'minimax-h3', 'openai-responses', 'anthropic-messages', 'openai-image-generations',
+    ])
+    fireEvent.change(screen.getByLabelText(en.visionProvider), { target: { value: 'acme-gateway' } })
+    fireEvent.change(screen.getByLabelText(en.visionBaseUrl), { target: { value: 'https://gateway.example/v1' } })
+    fireEvent.change(screen.getByLabelText(en.visionModel), { target: { value: 'acme-vision' } })
 
     expect(actions.edit.mock.calls).toEqual([
-      ['apiKeyRef', 'TEAM_QWEN_KEY'],
-      ['apiKey', 'qwen-secret'],
+      ['provider', 'acme-gateway'],
+      ['baseURL', 'https://gateway.example/v1'],
+      ['model', 'acme-vision'],
     ])
-    expect(screen.getByLabelText(en.visionApiKey)).toHaveProperty('type', 'password')
-    expect(screen.getByText(`${en.visionModel}: qwen3.7-flash`)).toBeTruthy()
+    expect(screen.getByText(en.visionCustomHint)).toBeTruthy()
   })
 
   it('does not render while the visual-recognition namespace is unavailable', () => {

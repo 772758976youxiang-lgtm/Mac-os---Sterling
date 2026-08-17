@@ -79,6 +79,19 @@ export function apply(ctx: ClientContext): void {
     'ui-settings-plugins: credential invalidations',
   )
 
+  // The custom visual form reads value-free credential state, which changes
+  // independently of its settings namespace.
+  ctx.effect(() => {
+    const refreshVision = (): void => { vision.refresh() }
+    const refreshVisionCredential = (ref: string): void => { vision.refresh(ref) }
+    const disposers = [
+      ctx.remote.$on('settings/document-updated', refreshVision),
+      ctx.remote.$on('credentials/updated', refreshVisionCredential),
+      ctx.on('connection/reset', refreshVision),
+    ]
+    return () => { for (const dispose of disposers) dispose() }
+  }, 'ui-settings-plugins: visual model invalidations')
+
   let tabsVersion = -1
   let tabsRevision = -1
   let tabs: readonly PluginsSettingsTabEntry[] = []
