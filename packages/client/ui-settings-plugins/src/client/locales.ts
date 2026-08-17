@@ -19,6 +19,8 @@ export type PluginsSettingsLocaleKey =
   | 'emailDigestPasswordRef' | 'emailDigestPasswordRefHint' | 'emailDigestPassword' | 'emailDigestPasswordHint'
   | 'emailDigestPasswordSet' | 'emailDigestPasswordUnset'
   | 'emailDigestRecipients' | 'emailDigestRecipientsHint' | 'emailDigestFrom' | 'emailDigestFromHint'
+  | 'visionTitle' | 'visionDescription' | 'visionApiKeyRef' | 'visionApiKey' | 'visionApiKeyHint'
+  | 'visionConfigured' | 'visionNotConfigured' | 'visionModel' | 'visionBaseUrl'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -82,6 +84,15 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   emailDigestRecipientsHint: 'Separate multiple addresses with commas. May be left blank; recipients are then supplied per scheduled task or tool call.',
   emailDigestFrom: 'From address',
   emailDigestFromHint: 'Must be accepted by the SMTP provider.',
+  visionTitle: 'Image understanding',
+  visionDescription: 'Uses Qwen3.7-Flash when a text model needs to inspect an image.',
+  visionApiKeyRef: 'API key reference',
+  visionApiKey: 'Qwen API key',
+  visionApiKeyHint: 'Stored outside the settings file. Leave blank to keep the current key.',
+  visionConfigured: 'A key is configured.',
+  visionNotConfigured: 'No key is configured; image understanding is unavailable until one is.',
+  visionModel: 'Model',
+  visionBaseUrl: 'Endpoint',
 }
 
 /** Simplified Chinese copy. */
@@ -146,4 +157,13 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   emailDigestRecipientsHint: '多个邮箱请用逗号分隔，可留空；留空时收件人由定时任务或工具调用指定。',
   emailDigestFrom: '发件地址',
   emailDigestFromHint: '必须被 SMTP 服务商接受。',
+  visionTitle: '视觉识别',
+  visionDescription: '文本模型需要查看图片时，使用 Qwen3.7-Flash 进行识别。',
+  visionApiKeyRef: 'API Key 引用',
+  visionApiKey: 'Qwen API Key',
+  visionApiKeyHint: '不写入设置文件。留空表示保持当前密钥。',
+  visionConfigured: '已配置密钥。',
+  visionNotConfigured: '尚未配置密钥；配置后才能使用视觉识别。',
+  visionModel: '模型',
+  visionBaseUrl: '接口地址',
 }

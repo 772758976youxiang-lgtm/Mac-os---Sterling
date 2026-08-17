@@ -5,7 +5,7 @@ import { cleanup } from '@testing-library/react'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
-import { stubSettingsScope, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
+import { usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject, NS } from '../src/client/index.ts'
 import { McpManagementSettingsTab } from '../src/client/McpManagementSettingsTab.tsx'
 import { PluginInventorySettingsTab } from '../src/client/PluginInventorySettingsTab.tsx'
@@ -31,8 +31,6 @@ async function bench() {
     }
   }
   new RemoteService(ctx)
-  ctx.provide('connection', { api: {}, isLoopback: true } as never)
-  ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
   const list = vi.fn<() => Promise<ListResult>>()
     .mockResolvedValue({ ok: true, value: EMPTY })
   const mcp = vi.fn().mockResolvedValue({ ok: true, value: EMPTY_MCP })
@@ -49,7 +47,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-plugin-inventory browser plugin', () => {
   it('declares only the services used by the Settings Remote contribution', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.pluginInventory', 'settingsScope'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory'])
   })
 
   it('registers a localized tab without reading the Remote eagerly', async () => {

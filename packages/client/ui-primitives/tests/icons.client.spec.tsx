@@ -68,11 +68,15 @@ describe('FishLogo', () => {
 })
 
 describe('SterlingWordmark', () => {
-  it('renders the Sterling Harness name at the requested size', () => {
-    const { getByText } = render(<primitives.SterlingWordmark size={20} className="brand" />)
+  it('renders the supplied rose mark with the Sterling Harness name', () => {
+    const { container, getByText } = render(<primitives.SterlingWordmark size={20} className="brand" />)
     const sterling = getByText('Sterling')
     expect(sterling.parentElement?.classList.contains('brand')).toBe(true)
     expect((sterling as HTMLElement).style.fontSize).toBe('20px')
+    const mark = container.querySelector('img')!
+    expect(mark.getAttribute('src')).toBe('/branding/sterling-rose-192.png')
+    expect(mark.getAttribute('width')).toBe('20')
+    expect(mark.getAttribute('height')).toBe('20')
     const harness = getByText('HARNESS') as HTMLElement
     expect(harness.style.background).toBe('var(--dsw-alias-label-primary)')
     expect(harness.style.color).toBe('var(--dsw-alias-label-primary-inverted)')

@@ -8,6 +8,7 @@ const DIST_ROOT = fileURLToPath(new URL('../dist', import.meta.url))
 it('ships install metadata with the built web application', async () => {
   const index = await readFile(join(DIST_ROOT, 'index.html'), 'utf8')
   expect(index).toContain('<link rel="manifest" href="/manifest.webmanifest" />')
+  expect(index).toContain('<link rel="icon" type="image/png" href="/branding/sterling-rose-512.png" />')
 
   const manifest: unknown = JSON.parse(await readFile(join(DIST_ROOT, 'manifest.webmanifest'), 'utf8'))
   expect(manifest).toEqual({
@@ -17,19 +18,28 @@ it('ships install metadata with the built web application', async () => {
     start_url: '/',
     scope: '/',
     display: 'fullscreen',
-    icons: [{
-      src: '/favicon.svg',
-      sizes: 'any',
-      type: 'image/svg+xml',
-      purpose: 'any',
-    }],
+    icons: [
+      {
+        src: '/branding/sterling-rose-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any maskable',
+      },
+      {
+        src: '/branding/sterling-rose-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any maskable',
+      },
+    ],
   })
 })
 
-it('ships a favicon that switches to a light mark under dark color scheme', async () => {
-  const favicon = await readFile(join(DIST_ROOT, 'favicon.svg'), 'utf8')
-  // The light fill must live inside the dark-scheme media query, so the icon
-  // stays black in light mode and only turns white under a dark scheme.
-  expect(favicon).toMatch(/@media \(prefers-color-scheme: dark\)\s*{\s*path\s*{[^}]*fill:\s*#fff/i)
-  expect(favicon).toContain('fill="#000"')
+it('ships the supplied brand artwork at the PWA icon sizes', async () => {
+  const icon192 = await readFile(join(DIST_ROOT, 'branding', 'sterling-rose-192.png'))
+  const icon512 = await readFile(join(DIST_ROOT, 'branding', 'sterling-rose-512.png'))
+  const pngSignature = '89504e470d0a1a0a'
+
+  expect(icon192.subarray(0, 8).toString('hex')).toBe(pngSignature)
+  expect(icon512.subarray(0, 8).toString('hex')).toBe(pngSignature)
 })

@@ -10,20 +10,21 @@ const DEFAULT_API_KEY_REF = 'DASHSCOPE_API_KEY'
 const DEFAULT_MODEL = 'qwen3.7-flash'
 const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 
-/** Narrow settings fields the MCP management page needs to show. */
-export interface McpVisionSettings {
+/** Settings fields owned by the local image-understanding plugin. */
+export interface VisionSettings {
   visionApiKeyEnv?: string
   visionBaseURL?: string
   visionModel?: string
 }
 
-/** Reactive state shown by the MCP vision configuration block. */
-export interface McpVisionSettingsState {
+/** Reactive state shown by the vision plugin card. */
+export interface VisionSettingsState {
   available: boolean
   writable: boolean
   saving: boolean
   failed: boolean
   dirty: boolean
+  invalid: boolean
   apiKeyRef: string
   apiKeyDraft: string
   apiKeyConfigured: boolean
@@ -32,10 +33,10 @@ export interface McpVisionSettingsState {
   baseURL: string
 }
 
-/** Face injected into the MCP management tab. */
-export interface McpVisionSettingsFace {
+/** Face injected into the plugin configuration card. */
+export interface VisionSettingsFace {
   hooks: {
-    mcpVisionSettings: SnapshotStore<McpVisionSettingsState>
+    visionSettings: SnapshotStore<VisionSettingsState>
   }
   edit: (field: 'apiKey' | 'apiKeyRef', value: string) => void
   save: () => void
@@ -43,8 +44,8 @@ export interface McpVisionSettingsFace {
 }
 
 /** Owns staged text and writes the settings field plus write-only API key. */
-export class McpVisionSettingsController {
-  private readonly store: SnapshotStore<McpVisionSettingsState>
+export class VisionSettingsController {
+  private readonly store: SnapshotStore<VisionSettingsState>
   private apiKeyDraft = ''
   private apiKeyRefDraft: string | undefined
   private saving = false
@@ -52,7 +53,7 @@ export class McpVisionSettingsController {
   private credential = { ref: '', configured: false, writable: true }
 
   constructor(
-    private readonly scope: SettingsScope<McpVisionSettings>,
+    private readonly scope: SettingsScope<VisionSettings>,
     private readonly api: Pick<IApiClient, 'credentials'>,
   ) {
     this.store = createSnapshotStore(this.projection())
@@ -64,7 +65,7 @@ export class McpVisionSettingsController {
   }
 
   /** Build the view from the current scope and staged edits. */
-  private projection(): McpVisionSettingsState {
+  private projection(): VisionSettingsState {
     const snapshot = this.scope.getSnapshot()
     const value = snapshot.value
     const apiKeyRef = this.apiKeyRefDraft ?? (value?.visionApiKeyEnv ?? DEFAULT_API_KEY_REF)
@@ -74,6 +75,7 @@ export class McpVisionSettingsController {
       saving: this.saving,
       failed: this.failed,
       dirty: this.apiKeyDraft.length > 0 || this.apiKeyRefDraft !== undefined,
+      invalid: false,
       apiKeyRef,
       apiKeyDraft: this.apiKeyDraft,
       apiKeyConfigured: this.credential.ref === apiKeyRef && this.credential.configured,
@@ -157,9 +159,9 @@ export class McpVisionSettingsController {
   }
 
   /** Return the registration face consumed by the slot renderer. */
-  inject(): McpVisionSettingsFace {
+  inject(): VisionSettingsFace {
     return {
-      hooks: { mcpVisionSettings: this.store },
+      hooks: { visionSettings: this.store },
       edit: (field, value) => { this.edit(field, value) },
       save: () => { this.save() },
       discard: () => { this.discard() },
@@ -168,13 +170,14 @@ export class McpVisionSettingsController {
 }
 
 /** No-op face used by minimal test/composition hosts that omit Settings. */
-export function unavailableMcpVisionSettingsFace(): McpVisionSettingsFace {
-  const state: McpVisionSettingsState = {
+export function unavailableVisionSettingsFace(): VisionSettingsFace {
+  const state: VisionSettingsState = {
     available: false,
     writable: false,
     saving: false,
     failed: false,
     dirty: false,
+    invalid: false,
     apiKeyRef: DEFAULT_API_KEY_REF,
     apiKeyDraft: '',
     apiKeyConfigured: false,
@@ -183,7 +186,7 @@ export function unavailableMcpVisionSettingsFace(): McpVisionSettingsFace {
     baseURL: DEFAULT_BASE_URL,
   }
   return {
-    hooks: { mcpVisionSettings: createSnapshotStore(state) },
+    hooks: { visionSettings: createSnapshotStore(state) },
     edit: () => {},
     save: () => {},
     discard: () => {},

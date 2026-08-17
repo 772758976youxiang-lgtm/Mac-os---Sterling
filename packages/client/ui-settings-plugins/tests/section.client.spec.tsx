@@ -17,12 +17,15 @@ import { ConfigurablePluginsTab } from '../src/client/ConfigurablePluginsTab.tsx
 import type { ConfigurablePluginsTabProps } from '../src/client/ConfigurablePluginsTab.tsx'
 import { PluginsSettingsSection } from '../src/client/PluginsSettingsSection.tsx'
 import type { PluginsSettingsSectionProps, PluginsSettingsTabEntry } from '../src/client/PluginsSettingsSection.tsx'
+import { VisionCard } from '../src/client/VisionCard.tsx'
+import type { VisionCardProps } from '../src/client/VisionCard.tsx'
 import { WebSearchCard } from '../src/client/WebSearchCard.tsx'
 import type { WebSearchCardProps } from '../src/client/WebSearchCard.tsx'
 import type { AgentLoopCardState } from '../src/client/agent-loop-card-controller.ts'
 import type { BashCardState } from '../src/client/bash-card-controller.ts'
 import type { CardFieldState, CardShell } from '../src/client/card-form.ts'
 import type { WebSearchCardState } from '../src/client/web-search-card-controller.ts'
+import type { VisionSettingsState } from '../src/client/vision-card-controller.ts'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -78,6 +81,23 @@ function renderBash(state: Partial<BashCardState> = {}) {
   const actions = cardActions()
   const props = { ...actions, t, useBashCard: bindSnapshotSelector(store) } as unknown as BashCardProps
   render(<BashCard {...props} />)
+  return actions
+}
+
+function renderVision(state: Partial<VisionSettingsState> = {}) {
+  const store = createSnapshotStore<VisionSettingsState>({
+    ...settled,
+    apiKeyRef: 'DASHSCOPE_API_KEY',
+    apiKeyDraft: '',
+    apiKeyConfigured: false,
+    apiKeyWritable: true,
+    model: 'qwen3.7-flash',
+    baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    ...state,
+  })
+  const actions = cardActions()
+  const props = { ...actions, t, useVisionSettings: bindSnapshotSelector(store) } as unknown as VisionCardProps
+  render(<VisionCard {...props} />)
   return actions
 }
 
@@ -397,5 +417,31 @@ describe('WebSearchCard', () => {
       ['maxUses', '4'],
     ])
     expect(actions.resetField.mock.calls).toEqual([['baseURL'], ['maxUses']])
+  })
+})
+
+describe('VisionCard', () => {
+  it('is an independent plugin card and stages its reference and key only when expanded', () => {
+    const actions = renderVision()
+
+    expect(screen.getByText(en.visionTitle)).toBeTruthy()
+    expect(screen.queryByLabelText(en.visionApiKeyRef)).toBeNull()
+
+    fireEvent.click(screen.getByText(en.visionTitle))
+    fireEvent.change(screen.getByLabelText(en.visionApiKeyRef), { target: { value: 'TEAM_QWEN_KEY' } })
+    fireEvent.change(screen.getByLabelText(en.visionApiKey), { target: { value: 'qwen-secret' } })
+
+    expect(actions.edit.mock.calls).toEqual([
+      ['apiKeyRef', 'TEAM_QWEN_KEY'],
+      ['apiKey', 'qwen-secret'],
+    ])
+    expect(screen.getByLabelText(en.visionApiKey)).toHaveProperty('type', 'password')
+    expect(screen.getByText(`${en.visionModel}: qwen3.7-flash`)).toBeTruthy()
+  })
+
+  it('does not render while the visual-recognition namespace is unavailable', () => {
+    renderVision({ available: false })
+
+    expect(screen.queryByText(en.visionTitle)).toBeNull()
   })
 })
