@@ -53,8 +53,10 @@
     - id: schedule
       name: '@deepseek-ai/dsh-schedule'
 
-    # The digest is available in Web settings but starts disabled until its
-    # mailbox and credential are filled in through the Plugins page.
+    # Email delivery starts disabled until its mailbox and credential are
+    # filled in through the Plugins page; the agent then sends through the
+    # mcp__email__send tool as reminders complete. Recipients are intentionally
+    # left empty: each scheduled task supplies its own via the tool's `to`.
     - id: email-digest
       name: '@deepseek-ai/dsh-email-digest'
       config:
@@ -65,12 +67,8 @@
           secure: true
           username: disabled@example.com
           passwordRef: DSH_EMAIL_SMTP_PASSWORD
-        recipients: [disabled@example.com]
-        sendAt: '18:00'
-        timeZone: Asia/Shanghai
+        recipients: []
         from: disabled@example.com
-        subject: Sterling Harness daily digest
-        retryMinutes: 15
 
     - id: code-runtime
       name: '@deepseek-ai/dsh-code-runtime-worker-thread'

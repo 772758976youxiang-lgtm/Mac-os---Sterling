@@ -27,7 +27,9 @@ async function harness(): Promise<{
   ctx.loader.builtins.pending = pendingPlugin
   ctx.loader.internal = {
     import: async (name: string) => {
-      if (name === '@deepseek-ai/dsh-mcp-client' || name === '@deepseek-ai/dsh-mcp-image-generation') return activePlugin
+      if (name === '@deepseek-ai/dsh-mcp-client'
+        || name === '@deepseek-ai/dsh-mcp-image-generation'
+        || name === '@deepseek-ai/dsh-email-digest') return activePlugin
       throw new Error(`unexpected module ${name}`)
     },
   } as never
@@ -100,6 +102,20 @@ describe('PluginInventoryGateway', () => {
       servers: [{
         entryId: imageId,
         serverName: 'image',
+        transport: 'local',
+        enabled: true,
+        fiberPhase: 'active',
+      }],
+    })
+  })
+
+  it('includes the local email delivery bridge in the MCP inventory', async () => {
+    const { ctx, inventory } = await harness()
+    const emailId = await ctx.loader.create({ name: '@deepseek-ai/dsh-email-digest' })
+    expect(inventory.mcp()).toMatchObject({
+      servers: [{
+        entryId: emailId,
+        serverName: 'email',
         transport: 'local',
         enabled: true,
         fiberPhase: 'active',

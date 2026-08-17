@@ -17,13 +17,13 @@ Durable session persistence, semantic checkpoint policy, and the shipped storage
 
 The [session-persistence decision](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md) records the persistence design.
 
-## Email Digest
+## Email Delivery
 
-Optional SMTP delivery of completed Session-local Schedule reminders.
+Model-facing SMTP email delivery.
 
 | Package | Role |
 |---|---|
-| [`email-digest/`](email-digest/README.md) | Collects completed Schedule follow-ups into durable Session events and sends a daily SMTP digest for live root Sessions. |
+| [`email-digest/`](email-digest/README.md) | Registers the `mcp__email__send` tool that sends mail through the configured SMTP account. |
 
 ## Projection
 

@@ -23,8 +23,9 @@
 }
 
 /* Rail geometry (figma rail spec): 36x36 control boxes centered in the 56px
-   rail (10px side padding), 12px vertical rhythm, 18px from the rail top to
-   the whale's box (24px to the 24-wide whale glyph itself). */
+   rail (10px side padding), 12px vertical rhythm, and 18px from the rail top
+   to the first control box. Brand actions and the expand toggle each own one
+   row so every control remains inside the clipped rail. */
 .root.collapsed {
   padding: 18px 10px 6px;
 }
@@ -58,7 +59,7 @@
   from { opacity: 0; }
 }
 
-/* At the 150ms rail settle, the four upper controls enter from the former
+/* At the 150ms rail settle, the upper controls enter from the former
    rail right edge over the remaining 150ms of the AppFrame track transition.
    The bottom-pinned settings seat shares their opacity timeline but stays
    horizontally fixed. Only a live collapse gets .railIn; a cold collapsed
@@ -101,10 +102,16 @@
 }
 
 .collapsed .logoRow {
-  height: 36px;
+  flex-direction: column;
+  gap: 12px;
+  height: 84px;
   padding: 0;
   margin-bottom: 12px;
   justify-content: flex-start;
+}
+
+.collapsed .toggle {
+  order: -1;
 }
 
 /* Brand group (figma I133:7632): the full wordmark rides the text ink

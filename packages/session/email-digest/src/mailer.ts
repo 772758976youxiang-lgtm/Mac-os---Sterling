@@ -10,6 +10,8 @@ export interface SmtpSpec {
   readonly username: string
   readonly password: string
   readonly from: string
+  /** Optional sender display name; shown instead of the bare address when set. */
+  readonly fromName?: string
   readonly recipients: readonly string[]
 }
 
@@ -30,7 +32,9 @@ export async function sendSmtpDigest(spec: SmtpSpec, mail: DigestMail): Promise<
   })
   try {
     await transport.sendMail({
-      from: spec.from,
+      from: spec.fromName === undefined || spec.fromName.trim() === ''
+        ? spec.from
+        : { name: spec.fromName, address: spec.from },
       to: [...spec.recipients],
       subject: mail.subject,
       text: mail.text,

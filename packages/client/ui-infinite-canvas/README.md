@@ -8,7 +8,7 @@ The plugin bundles React Flow's global stylesheet with its selectors unchanged a
 
 Canvas documents are stored in browser `localStorage` under the current session, workspace, or global fallback key. Storage failures do not block in-memory editing. The plugin does not call the Host API, change the session log, send canvas data to a model, or execute AI nodes.
 
-The plugin registers into the `sidebar.brand.action` and `shell.overlay` slots and shares one root-scoped store handle between them. The overlay keeps the Harness tree mounted beneath the canvas and provides its own mode menu so the user can return to Harness mode. Each menu opens toward the viewport interior for its host placement.
+The plugin registers into the `sidebar.brand.action` and `shell.overlay` slots and shares one root-scoped store handle between them. The overlay keeps the Harness tree mounted beneath the canvas and provides its own mode menu so the user can return to Harness mode. Each menu uses the shared body portal and opens toward the viewport interior, so sidebar clipping cannot crop it.
 
 ## Model Experience
 

@@ -20,11 +20,7 @@ export interface EmailDigestSettings {
   smtpUsername?: string
   passwordRef?: string
   recipients?: string
-  sendAt?: string
-  timeZone?: string
   from?: string
-  subject?: string
-  retryMinutes?: number
 }
 
 interface CredentialState {
@@ -54,11 +50,7 @@ export interface EmailDigestCardState extends CardShell {
   smtpUsername: CardFieldState
   passwordRef: CardFieldState
   recipients: CardFieldState
-  sendAt: CardFieldState
-  timeZone: CardFieldState
   from: CardFieldState
-  subject: CardFieldState
-  retryMinutes: CardFieldState
   smtpPassword: CardFieldState
   passwordConfigured: boolean
   passwordWritable: boolean
@@ -83,8 +75,7 @@ export class EmailDigestCardController {
       booleanField('enabled'),
       textField('smtpHost'), numberField('smtpPort'), booleanField('smtpSecure'),
       textField('smtpUsername'), textField('passwordRef'), recipientsField(),
-      textField('sendAt'), textField('timeZone'), textField('from'), textField('subject'),
-      numberField('retryMinutes'),
+      textField('from'),
     ], [{ field: PASSWORD_FIELD, write: text => this.writePassword(text) }])
     this.store = this.form.bind(() => this.projection())
     scope.subscribe(() => { void this.readCredential() })
@@ -101,11 +92,7 @@ export class EmailDigestCardController {
       smtpUsername: this.form.field('smtpUsername'),
       passwordRef: this.form.field('passwordRef'),
       recipients: this.form.field('recipients'),
-      sendAt: this.form.field('sendAt'),
-      timeZone: this.form.field('timeZone'),
       from: this.form.field('from'),
-      subject: this.form.field('subject'),
-      retryMinutes: this.form.field('retryMinutes'),
       smtpPassword: this.form.field(PASSWORD_FIELD),
       passwordConfigured: this.credential.configured,
       passwordWritable: this.credential.writable,

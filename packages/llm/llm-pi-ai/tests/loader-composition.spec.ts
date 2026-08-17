@@ -96,6 +96,10 @@ describe('llm-pi-ai real dormant composition', () => {
     // The shipped posture: the adapter exists, no route does.
     expect(ctx.llm.listProviders()).toEqual([])
 
+    // The Web configuration surface needs the dormant namespace to declare a
+    // route before any profile exists.
+    expect(ctx.settings.describe().map(descriptor => String(descriptor.ns))).toContain('llm-pi-ai')
+
     // Exactly what the web Models page leaves on disk.
     await writeFile(settingsPath, [
       'llm-pi-ai:',

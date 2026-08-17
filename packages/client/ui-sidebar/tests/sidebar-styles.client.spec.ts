@@ -59,7 +59,11 @@ describe('SidebarRoot.module.css', () => {
   })
 
   it('gives shell rail controls the same base anchor for their shared translation', () => {
-    expect(declarations('.collapsed .logoRow')?.get('justify-content')).toBe('flex-start')
+    const logoRow = declarations('.collapsed .logoRow')
+    expect(logoRow?.get('justify-content')).toBe('flex-start')
+    expect(logoRow?.get('flex-direction')).toBe('column')
+    expect(logoRow?.get('height')).toBe('84px')
+    expect(declarations('.collapsed .toggle')?.get('order')).toBe('-1')
     expect(declarations('.collapsed .newSession')?.get('align-self')).toBe('flex-start')
     expect(declarations('.collapsed .newSession')?.get('width')).toBe('36px')
   })

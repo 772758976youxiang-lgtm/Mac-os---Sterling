@@ -8,7 +8,7 @@
 
 画布文档保存在浏览器 `localStorage`，优先使用当前会话，其次使用当前工作区，最后使用全局回退键。保存失败不会阻止内存中的继续编辑。插件不调用 Host API、不修改会话日志、不把画布内容发送给模型，也不执行 AI 节点。
 
-插件注册到 `sidebar.brand.action` 和 `shell.overlay` 插槽，并在两处共享一个根级 store handle。覆盖层会让下方 Harness 界面保持挂载，并提供自己的模式菜单，确保用户可以返回 Harness 模式。两处菜单都会朝各自宿主的视口内部展开。
+插件注册到 `sidebar.brand.action` 和 `shell.overlay` 插槽，并在两处共享一个根级 store handle。覆盖层会让下方 Harness 界面保持挂载，并提供自己的模式菜单，确保用户可以返回 Harness 模式。两处菜单都通过共享的 body portal 渲染并朝视口内部展开，因此不会被侧边栏裁剪。
 
 ## 模型体验
 

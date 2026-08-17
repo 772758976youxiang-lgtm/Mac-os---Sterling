@@ -62,10 +62,12 @@ export interface Config {
   /**
    * Legacy configuration accepted for profile compatibility. Attached-image
    * turns remain on the session's selected route and use image tools instead.
-   * @deprecated No longer changes model routing.
-   */
+  * @deprecated No longer changes model routing.
+  */
   imageFallback?: {
+    /** Legacy provider identifier retained only for accepted profile syntax. */
     provider: string
+    /** Legacy model identifier retained only for accepted profile syntax. */
     model: string
   }
 }

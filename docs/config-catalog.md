@@ -585,6 +585,39 @@ export interface Config {
 
 Source: [`packages/e2b/e2b/src/index.ts:43`](../packages/e2b/e2b/src/index.ts)
 
+<a id="deepseek-aidsh-email-digest"></a>
+
+## `@deepseek-ai/dsh-email-digest`
+
+Requires: `tools` · `credentials`
+
+```ts config-catalog
+/** SMTP delivery configuration. Secrets are credential references, not values. */
+export interface Config {
+  /** Whether the email tool is active. Defaults to true for composed users. */
+  enabled?: boolean
+  /** SMTP connection parameters and the credential reference used for authentication. */
+  smtp: {
+    /** SMTP server hostname. */
+    host: string
+    /** SMTP server port; defaults to 465 for secure delivery and 587 otherwise. */
+    port?: number
+    /** Use TLS for the SMTP connection. */
+    secure?: boolean
+    /** Authenticated SMTP mailbox address. */
+    username: string
+    /** Credential reference that resolves to the SMTP mailbox password. */
+    passwordRef: string
+  }
+  /** Optional default recipient addresses; tasks can supply their own via the `to` tool argument. */
+  recipients: string[]
+  /** Sender address; defaults to `smtp.username`. */
+  from?: string
+}
+```
+
+Source: [`packages/session/email-digest/src/index.ts:91`](../packages/session/email-digest/src/index.ts)
+
 <a id="deepseek-aidsh-fs-local"></a>
 
 ## `@deepseek-ai/dsh-fs-local`
@@ -725,7 +758,7 @@ Source: [`packages/hooks/hooks-codex/src/index.ts:44`](../packages/hooks/hooks-c
 
 ## `@deepseek-ai/dsh-host-apiproxy`
 
-Requires: `agentDefaultModel` · `agents` · `attachments` · `directoryPicker` · `llm` · `sessions` · `subagents` · `sessionQuery` · `tools` · `userQuestions` · `workspaceRegistry`
+Requires: `agentDefaultModel` · `agents` · `attachments` · `directoryPicker` · `llm` · `sessions` · `subagents` · `sessionQuery` · `tools` · `userQuestions` · `workspaceRegistry` · `schedule`
 
 ```ts config-catalog
 /** Gateway plugin configuration. */
@@ -750,6 +783,17 @@ export interface Config {
    * @default 1024
    */
   coldBlankProbeMaxBytes?: number
+  /**
+   * Legacy configuration accepted for profile compatibility. Attached-image
+   * turns remain on the session's selected route and use image tools instead.
+  * @deprecated No longer changes model routing.
+  */
+  imageFallback?: {
+    /** Legacy provider identifier retained only for accepted profile syntax. */
+    provider: string
+    /** Legacy model identifier retained only for accepted profile syntax. */
+    model: string
+  }
 }
 ```
 
@@ -920,6 +964,8 @@ export interface PiAiProviderProfile {
    * no protocol at all; a route the catalog does not ship must name one.
    */
   api?: string
+  /** Controls accepted only for an `openai-image-generations` route. */
+  imageGeneration?: OpenAIImageGenerationConfig
   /** Endpoint for this route's models; defaults to the installed catalog's endpoint. */
   baseURL?: string
   /**
@@ -985,6 +1031,18 @@ export interface PiAiProviderProfile {
   streamIdleTimeoutMs?: number
   /** Provider-owned model-request retry policy; omission uses normal defaults. */
   retryPolicy?: RetryPolicyConfig
+}
+
+/** Per-route controls supported by OpenAI-compatible image-generation endpoints. */
+export interface OpenAIImageGenerationConfig {
+  /** Image dimensions sent as `size`. */
+  size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto'
+  /** Quality tier sent as `quality`. */
+  quality?: 'low' | 'medium' | 'high' | 'auto'
+  /** Number of images requested from one prompt. */
+  n?: number
+  /** Response encoding requested from the provider. */
+  responseFormat?: 'b64_json' | 'url'
 }
 
 /** One configured model entry: an id plus the catalog fields it overrides. */
@@ -1079,7 +1137,7 @@ type WithheldThinkingFormat = 'chat-template' | 'qwen-chat-template'
 
 Depends on: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`)
 
-Source: [`packages/llm/llm-pi-ai/src/config.ts:172`](../packages/llm/llm-pi-ai/src/config.ts)
+Source: [`packages/llm/llm-pi-ai/src/config.ts:181`](../packages/llm/llm-pi-ai/src/config.ts)
 
 <a id="deepseek-aidsh-llm-replay"></a>
 
@@ -1276,6 +1334,38 @@ export interface ReconnectConfig {
 ```
 
 Source: [`packages/mcp/mcp-client/src/index.ts:98`](../packages/mcp/mcp-client/src/index.ts)
+
+<a id="deepseek-aidsh-mcp-image-generation"></a>
+
+## `@deepseek-ai/dsh-mcp-image-generation`
+
+Requires: `tools` · `llm` · `attachments` · `settings`
+
+```ts config-catalog
+/** Configuration for the local image MCP bridge. */
+export interface Config {
+  /** Optional provider route; when omitted the first route owning `model` is used. */
+  provider?: string
+  /** Configured OpenAI Image API model id. Defaults to `gpt-image-2`. */
+  model?: string
+  /** Cooperative upper bound for one image-generation request. */
+  timeoutMs?: number
+  /** Literal Qwen API key; prefer {@link visionApiKeyEnv} for persisted credentials. */
+  visionApiKey?: string
+  /** Credential reference resolved for each vision request. */
+  visionApiKeyEnv?: string
+  /** OpenAI-compatible Qwen vision endpoint base. */
+  visionBaseURL?: string
+  /** Qwen multimodal model id. */
+  visionModel?: string
+  /** Maximum output tokens requested from Qwen vision. */
+  visionMaxTokens?: number
+  /** Cooperative upper bound for one vision request. */
+  visionTimeoutMs?: number
+}
+```
+
+Source: [`packages/mcp/mcp-image-generation/src/index.ts:35`](../packages/mcp/mcp-image-generation/src/index.ts)
 
 <a id="deepseek-aidsh-message-feedback"></a>
 
@@ -2224,7 +2314,7 @@ Source: [`packages/e2b/subprocess-e2b/src/index.ts:25`](../packages/e2b/subproce
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.persona} for its contract). */
 export interface Config {
-  /** Include the fixed DeepSeek Harness identity before the deployment persona (default true). */
+  /** Include the fixed Sterling Harness identity before the deployment persona (default true). */
   includeHarnessIdentity?: boolean
   /** Include dynamic runtime-context snapshots in model history (default true). */
   includeRuntimeContext?: boolean
@@ -3039,6 +3129,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-directory-picker-browse` ([`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-directory-picker-native` ([`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-goal` ([`packages/client/ui-goal/src/index.ts`](../packages/client/ui-goal/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-infinite-canvas` ([`packages/client/ui-infinite-canvas/src/index.ts`](../packages/client/ui-infinite-canvas/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-input-trigger` ([`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-jobs` ([`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-layout` ([`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts))
@@ -3051,6 +3142,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-settings-schedules` ([`packages/client/ui-settings-schedules/src/index.ts`](../packages/client/ui-settings-schedules/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-sidebar` ([`packages/client/ui-sidebar/src/index.ts`](../packages/client/ui-sidebar/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-skill` ([`packages/client/ui-skill/src/index.ts`](../packages/client/ui-skill/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-subagent` ([`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts))

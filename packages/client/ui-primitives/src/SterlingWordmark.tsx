@@ -25,7 +25,7 @@ export function SterlingWordmark({ size = 24, className }: IconProps) {
         style={{
           padding: `${Math.max(1, Math.round(size * 0.08))}px ${Math.max(3, Math.round(size * 0.17))}px`,
           borderRadius: 2,
-          background: 'currentColor',
+          background: 'var(--dsw-alias-label-primary)',
           color: 'var(--dsw-alias-label-primary-inverted)',
           fontSize: badgeFontSize,
           fontWeight: 700,

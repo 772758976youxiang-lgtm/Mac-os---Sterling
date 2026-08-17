@@ -38,6 +38,7 @@ import { queueDockEntry } from './queue/QueueDock.tsx'
 import { ConversationRoot } from './skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
 import { DetailsPanel } from './skeleton/DetailsPanel.tsx'
+import { CompletionBanner } from './skeleton/CompletionBanner.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
@@ -246,6 +247,13 @@ export function apply(ctx: Context): void {
       },
     }),
   }, ConversationRoot)
+
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'completion-banner',
+    order: 20,
+    locale: NS,
+  }, CompletionBanner))
 
   // The strict session body fills the resident scrollport without owning it;
   // the Hero/composer path therefore stays fixed while the first blank

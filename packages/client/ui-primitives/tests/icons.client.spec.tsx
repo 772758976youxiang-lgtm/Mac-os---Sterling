@@ -73,6 +73,8 @@ describe('SterlingWordmark', () => {
     const sterling = getByText('Sterling')
     expect(sterling.parentElement?.classList.contains('brand')).toBe(true)
     expect((sterling as HTMLElement).style.fontSize).toBe('20px')
-    expect(getByText('HARNESS')).toBeTruthy()
+    const harness = getByText('HARNESS') as HTMLElement
+    expect(harness.style.background).toBe('var(--dsw-alias-label-primary)')
+    expect(harness.style.color).toBe('var(--dsw-alias-label-primary-inverted)')
   })
 })

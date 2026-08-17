@@ -12,8 +12,7 @@ export type EmailDigestCardProps =
   & InjectFace<EmailDigestCardFace>
 
 type EditableField =
-  | 'smtpHost' | 'smtpPort' | 'smtpUsername' | 'passwordRef' | 'recipients'
-  | 'sendAt' | 'timeZone' | 'from' | 'subject' | 'retryMinutes'
+  | 'smtpHost' | 'smtpPort' | 'smtpUsername' | 'passwordRef' | 'recipients' | 'from'
 
 /** Render editable SMTP, schedule and recipient settings for the digest. */
 export function EmailDigestCard(props: EmailDigestCardProps) {
@@ -75,11 +74,7 @@ export function EmailDigestCard(props: EmailDigestCardProps) {
         onEdit={(text) => { props.edit('smtpPassword', text) }}
       />
       {value('recipients', 'plugin-config-email-recipients', t('emailDigestRecipients'), t('emailDigestRecipientsHint'))}
-      {value('sendAt', 'plugin-config-email-send-at', t('emailDigestSendAt'), t('emailDigestSendAtHint'))}
-      {value('timeZone', 'plugin-config-email-time-zone', t('emailDigestTimeZone'), t('emailDigestTimeZoneHint'))}
       {value('from', 'plugin-config-email-from', t('emailDigestFrom'), t('emailDigestFromHint'))}
-      {value('subject', 'plugin-config-email-subject', t('emailDigestSubject'), t('emailDigestSubjectHint'))}
-      {value('retryMinutes', 'plugin-config-email-retry', t('emailDigestRetry'), t('emailDigestRetryHint'), true)}
     </PluginCard>
   )
 }

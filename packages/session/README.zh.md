@@ -17,13 +17,13 @@
 
 [会话持久化决策](../../.agents/notes/implemented/architecture/2026-06-14-session-persistence.md)记录了持久化设计。
 
-## 邮件日报
+## 邮件发送
 
-已完成 Session-local Schedule 提醒的可选 SMTP 投递。
+面向模型的 SMTP 邮件发送。
 
 | 包 | 职责 |
 |---|---|
-| [`email-digest/`](email-digest/README.md) | 将已完成的 Schedule follow-up 收集为持久 Session 事件，并为 live 根 Session 发送每日 SMTP 日报。 |
+| [`email-digest/`](email-digest/README.md) | 注册 `mcp__email__send` 工具，用已配置的 SMTP 账号发送邮件。 |
 
 ## 投影
 

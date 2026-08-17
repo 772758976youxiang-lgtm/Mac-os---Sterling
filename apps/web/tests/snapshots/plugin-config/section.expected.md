@@ -38,6 +38,6 @@
           - text: 网页搜索 DeepSeek 搜索提供方。
           - img
       - listitem:
-        - 'button "展开设置: 邮件日报"':
-          - text: 邮件日报 每天通过 SMTP 发送已完成的定时任务结果。
+        - 'button "展开设置: 邮件发送"':
+          - text: 邮件发送 通过 mcp__email__send 工具用已配置的 SMTP 账号发送邮件。
           - img

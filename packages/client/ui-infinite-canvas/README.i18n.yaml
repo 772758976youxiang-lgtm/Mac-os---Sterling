@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-infinite-canvas/README.md
-README.md: c4d5f7b29e271bc83273a20fe1f4c793c55cec47
-README.zh.md: dd5182223dfbb296f46ff91bf758d62fba3b4386
+README.md: 3491a78c8bb31f7bcfe9645b8b96ce1f9d3cc372
+README.zh.md: 975a7790a5107a6683853f7d2d2521738b67ff3a

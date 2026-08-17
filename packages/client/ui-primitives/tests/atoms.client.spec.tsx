@@ -335,6 +335,21 @@ describe('Menu', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('labels a portalled menu for assistive technology', () => {
+    render(
+      <Menu
+        portal
+        open
+        ariaLabel="Choose mode"
+        anchor={<button type="button">Mode</button>}
+        items={items}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />)
+
+    expect(screen.getByRole('menu', { name: 'Choose mode' })).toBeTruthy()
+  })
+
   it('portal mode resolves align=end / side=top to clamped left/top coordinates', () => {
     render(
       <Menu portal open align="end" side="top" anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={() => {}} />)

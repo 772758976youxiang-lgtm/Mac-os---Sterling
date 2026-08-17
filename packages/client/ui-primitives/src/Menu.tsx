@@ -85,9 +85,10 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * scroll/resize; return null to skip placement for that frame.
  * @param props.footer - rows pinned below the scrolling items area, separated
  * by a hairline; they stay visible while the items above scroll.
+ * @param props.ariaLabel - accessible name for the menu list.
  * @returns anchor wrapper with the conditional list.
  */
-export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, getAnchorRect, footer, className }: {
+export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, getAnchorRect, footer, className, ariaLabel }: {
   open: boolean
   anchor: ReactNode
   items: readonly MenuEntry[]
@@ -104,6 +105,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   compact?: boolean
   getAnchorRect?: () => DOMRect | null
   className?: string
+  ariaLabel?: string
 }) {
   const rootRef = useRef<HTMLSpanElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -268,6 +270,8 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       className={clsx(css.list, dense && css.denseList, compact && css.compactList, scrollable && css.scrollable, portal && css.portal, side === 'top' && !portal && css.sideTop, align === 'end' && !portal && css.alignEnd)}
       style={portal ? fixedPos ?? MEASURE_STYLE : undefined}
       role="menu"
+      aria-label={ariaLabel}
+      data-align={align}
       // React portals bubble synthetic events through the REACT tree: without
       // this stop, an item click re-fires the anchor row's own onClick
       // (open/toggle) after onSelect.

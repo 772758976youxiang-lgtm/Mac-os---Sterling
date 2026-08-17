@@ -8,8 +8,9 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../../core/agent" },
-    { "path": "../../credentials/credentials" },
     { "path": "../../core/session" },
+    { "path": "../../core/tools" },
+    { "path": "../../credentials/credentials" },
     { "path": "../../session/session-persistence" },
     { "path": "../../runtime-diagnostics/invariants" },
     { "path": "../../settings/settings" }

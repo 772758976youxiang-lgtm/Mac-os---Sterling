@@ -38,6 +38,7 @@ async function bench() {
   await runtime.root.declare({
     'conversation': { kind: 'single', scope: 'session-maybe' },
     'details': { kind: 'single', scope: 'session' },
+    'shell.overlay': { kind: 'list', scope: 'root' },
     'settings.general.item': { kind: 'list', scope: 'root' },
   }, (_p: { renderSlot?: unknown }) => null)
 
@@ -109,6 +110,12 @@ describe('apply wiring', () => {
     expect(b.slots.entries('conversation.chat.node').map(entry => entry.options.key)).not.toContain('tool-call')
     // Stats stick with the composer (not inside ChatView).
     expect(b.slots.entries('conversation.composer.dock').map(e => e.options.id)).toEqual(['stats'])
+    await b.runtime.dispose()
+  })
+
+  it('registers the completion banner in the frame overlay', async () => {
+    const b = await bench()
+    expect(b.slots.entries('shell.overlay').map(entry => entry.options.id)).toContain('completion-banner')
     await b.runtime.dispose()
   })
 

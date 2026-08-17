@@ -18,9 +18,7 @@ export type PluginsSettingsLocaleKey =
   | 'emailDigestSecure' | 'emailDigestSecureHint' | 'emailDigestUsername' | 'emailDigestUsernameHint'
   | 'emailDigestPasswordRef' | 'emailDigestPasswordRefHint' | 'emailDigestPassword' | 'emailDigestPasswordHint'
   | 'emailDigestPasswordSet' | 'emailDigestPasswordUnset'
-  | 'emailDigestRecipients' | 'emailDigestRecipientsHint' | 'emailDigestSendAt' | 'emailDigestSendAtHint'
-  | 'emailDigestTimeZone' | 'emailDigestTimeZoneHint' | 'emailDigestFrom' | 'emailDigestFromHint'
-  | 'emailDigestSubject' | 'emailDigestSubjectHint' | 'emailDigestRetry' | 'emailDigestRetryHint'
+  | 'emailDigestRecipients' | 'emailDigestRecipientsHint' | 'emailDigestFrom' | 'emailDigestFromHint'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -62,10 +60,10 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   webSearchBaseUrlHint: 'Leave blank to use the provider default.',
   webSearchMaxUses: 'Max searches per request',
   webSearchMaxUsesHint: 'How many times one request may search before it must answer.',
-  emailDigestTitle: 'Email digest',
-  emailDigestDescription: 'Send completed scheduled results over SMTP each day.',
-  emailDigestEnabled: 'Enable email digest',
-  emailDigestEnabledHint: 'Only enabled digests collect results and send daily email.',
+  emailDigestTitle: 'Email delivery',
+  emailDigestDescription: 'Sends email through the mcp__email__send tool using the configured SMTP account.',
+  emailDigestEnabled: 'Enable email delivery',
+  emailDigestEnabledHint: 'Only enabled accounts can send email through the MCP tool.',
   emailDigestHost: 'SMTP host',
   emailDigestHostHint: 'For QQ use smtp.qq.com; for 163 use smtp.163.com.',
   emailDigestPort: 'SMTP port',
@@ -81,17 +79,9 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   emailDigestPasswordSet: 'Authorization code configured.',
   emailDigestPasswordUnset: 'No authorization code configured.',
   emailDigestRecipients: 'Recipients',
-  emailDigestRecipientsHint: 'Separate multiple email addresses with commas.',
-  emailDigestSendAt: 'Daily send time',
-  emailDigestSendAtHint: 'Use 24-hour HH:mm, for example 18:00.',
-  emailDigestTimeZone: 'Time zone',
-  emailDigestTimeZoneHint: 'Use an IANA zone such as Asia/Shanghai.',
+  emailDigestRecipientsHint: 'Separate multiple addresses with commas. May be left blank; recipients are then supplied per scheduled task or tool call.',
   emailDigestFrom: 'From address',
   emailDigestFromHint: 'Must be accepted by the SMTP provider.',
-  emailDigestSubject: 'Subject prefix',
-  emailDigestSubjectHint: 'The date is appended to this subject.',
-  emailDigestRetry: 'Retry delay (minutes)',
-  emailDigestRetryHint: 'How long to wait after a failed delivery.',
 }
 
 /** Simplified Chinese copy. */
@@ -134,10 +124,10 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   webSearchBaseUrlHint: '留空则使用提供方默认地址。',
   webSearchMaxUses: '单次请求最多搜索次数',
   webSearchMaxUsesHint: '一次请求在必须作答前最多可以搜索多少次。',
-  emailDigestTitle: '邮件日报',
-  emailDigestDescription: '每天通过 SMTP 发送已完成的定时任务结果。',
-  emailDigestEnabled: '启用邮件日报',
-  emailDigestEnabledHint: '只有启用后才会收集结果并每天发送邮件。',
+  emailDigestTitle: '邮件发送',
+  emailDigestDescription: '通过 mcp__email__send 工具用已配置的 SMTP 账号发送邮件。',
+  emailDigestEnabled: '启用邮件发送',
+  emailDigestEnabledHint: '启用后 MCP 工具才能发送邮件。',
   emailDigestHost: 'SMTP 服务器',
   emailDigestHostHint: 'QQ 使用 smtp.qq.com；163 使用 smtp.163.com。',
   emailDigestPort: 'SMTP 端口',
@@ -153,15 +143,7 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   emailDigestPasswordSet: '已配置授权码。',
   emailDigestPasswordUnset: '尚未配置授权码。',
   emailDigestRecipients: '收件人',
-  emailDigestRecipientsHint: '多个邮箱请用逗号分隔。',
-  emailDigestSendAt: '每日发送时间',
-  emailDigestSendAtHint: '使用 24 小时制 HH:mm，例如 18:00。',
-  emailDigestTimeZone: '时区',
-  emailDigestTimeZoneHint: '使用 IANA 时区，例如 Asia/Shanghai。',
+  emailDigestRecipientsHint: '多个邮箱请用逗号分隔，可留空；留空时收件人由定时任务或工具调用指定。',
   emailDigestFrom: '发件地址',
   emailDigestFromHint: '必须被 SMTP 服务商接受。',
-  emailDigestSubject: '主题前缀',
-  emailDigestSubjectHint: '日期会自动追加到主题末尾。',
-  emailDigestRetry: '失败重试间隔（分钟）',
-  emailDigestRetryHint: '投递失败后等待多久再重试。',
 }

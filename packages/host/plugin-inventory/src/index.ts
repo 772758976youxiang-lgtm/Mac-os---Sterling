@@ -44,6 +44,7 @@ const FIBER_PHASE = {
 
 const MCP_CLIENT_MODULE = '@deepseek-ai/dsh-mcp-client'
 const MCP_IMAGE_GENERATION_MODULE = '@deepseek-ai/dsh-mcp-image-generation'
+const EMAIL_DELIVERY_MODULE = '@deepseek-ai/dsh-email-digest'
 
 /** Read the non-sensitive MCP facts that remain meaningful in a Loader entry. */
 function mcpConfig(config: unknown): { serverName: string; transport: McpServerInventoryEntry['transport'] } | undefined {
@@ -102,7 +103,10 @@ export class PluginInventoryGateway extends TypertRemoteService {
       if (entry.options.group) continue
       const config = entry.options.name === MCP_IMAGE_GENERATION_MODULE
         ? { serverName: 'image', transport: 'local' as const }
-        : entry.options.name === MCP_CLIENT_MODULE ? mcpConfig(entry.options.config) : undefined
+        : entry.options.name === MCP_CLIENT_MODULE ? mcpConfig(entry.options.config)
+          : entry.options.name === EMAIL_DELIVERY_MODULE
+            ? { serverName: 'email', transport: 'local' as const }
+            : undefined
       if (config === undefined) continue
       const prefixes = config.serverName === 'image'
         ? ['mcp__image__', 'mcp__vision__']
