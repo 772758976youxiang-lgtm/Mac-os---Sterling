@@ -21,14 +21,15 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
         class="iconButton toggle"
         type="button"
       >
-        <svg
+        <img
+          alt=""
+          aria-hidden="true"
           class="railFish"
-          data-content="163bba65"
-          fill="none"
+          draggable="false"
           height="24"
-          viewBox="0 0 16 16"
+          src="/sterling-icon.png"
+          style="display: block; flex: 0 0 auto; width: 24px; height: 24px; border-radius: 4px; object-fit: cover;"
           width="24"
-          xmlns="http://www.w3.org/2000/svg"
         />
         <svg
           class="panelIcon"
@@ -108,13 +109,22 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
           aria-hidden="true"
           style="display: inline-flex; align-items: center; gap: 6px; line-height: 1; white-space: nowrap;"
         >
+          <img
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+            height="24"
+            src="/sterling-icon.png"
+            style="display: block; flex: 0 0 auto; width: 24px; height: 24px; border-radius: 4px; object-fit: cover;"
+            width="24"
+          />
           <span
             style="font-size: 24px; font-weight: 650; letter-spacing: 0px;"
           >
             Sterling
           </span>
           <span
-            style="padding: 2px 4px; border-radius: 2px; background: currentcolor; color: var(--dsw-alias-label-primary-inverted); font-size: 10px; font-weight: 700; letter-spacing: 0px; line-height: 1.2;"
+            style="padding: 2px 4px; border-radius: 2px; background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-inverted); font-size: 10px; font-weight: 700; letter-spacing: 0px; line-height: 1.2;"
           >
             HARNESS
           </span>
@@ -212,13 +222,22 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
           aria-hidden="true"
           style="display: inline-flex; align-items: center; gap: 6px; line-height: 1; white-space: nowrap;"
         >
+          <img
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+            height="24"
+            src="/sterling-icon.png"
+            style="display: block; flex: 0 0 auto; width: 24px; height: 24px; border-radius: 4px; object-fit: cover;"
+            width="24"
+          />
           <span
             style="font-size: 24px; font-weight: 650; letter-spacing: 0px;"
           >
             Sterling
           </span>
           <span
-            style="padding: 2px 4px; border-radius: 2px; background: currentcolor; color: var(--dsw-alias-label-primary-inverted); font-size: 10px; font-weight: 700; letter-spacing: 0px; line-height: 1.2;"
+            style="padding: 2px 4px; border-radius: 2px; background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-inverted); font-size: 10px; font-weight: 700; letter-spacing: 0px; line-height: 1.2;"
           >
             HARNESS
           </span>

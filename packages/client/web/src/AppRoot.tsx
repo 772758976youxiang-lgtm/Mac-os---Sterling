@@ -11,6 +11,7 @@
 import { useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { KernelSignal, LoaderStatus } from './loader-status.ts'
+import { SterlingWordmark } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './AppRoot.module.css'
 
 /** AppRoot props: settled signal, fiber-state projection feed, boot failure report, deferred real-UI factory. */
@@ -39,7 +40,7 @@ export function AppRoot(props: AppRootProps) {
   return (
     <div className={css.boot}>
       <div className={css.card}>
-        <div className={css.wordmark}>HARNESS</div>
+        <div className={css.wordmark}><SterlingWordmark size={16} /></div>
         {!loud
           ? (
             <>

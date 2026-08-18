@@ -1,4 +1,5 @@
 import type { IconProps } from './icons/props.ts'
+import { SterlingMark } from './SterlingMark.tsx'
 
 /**
  * Render the Sterling Harness wordmark.
@@ -20,6 +21,7 @@ export function SterlingWordmark({ size = 24, className }: IconProps) {
         whiteSpace: 'nowrap',
       }}
     >
+      <SterlingMark size={size} />
       <span style={{ fontSize: size, fontWeight: 650, letterSpacing: 0 }}>Sterling</span>
       <span
         style={{

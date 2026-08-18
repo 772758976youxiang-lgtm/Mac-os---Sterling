@@ -7,7 +7,7 @@
 import { useId } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import {
-  IconChevronDownOutline14, IconFolderClose16, IconFolderOpen16, IconSparkle16,
+  IconChevronDownOutline14, IconFolderClose16, IconFolderOpen16, SterlingMark,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { workspaceTitleOf } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSlotProps } from '../contract/slots.ts'
@@ -119,10 +119,9 @@ export function HeroShell({ t, children }: HeroShellProps) {
         <div className={css.headline}>
           {/* The Sterling mark leads the headline with a 10px gap. */}
           <span className={css.fishHitbox}>
-            <IconSparkle16 size={34} className={css.fish} />
+            <SterlingMark size={34} className={css.fish} />
           </span>
           <span className={css.headlineText}>{t('hero.headline')}</span>
-          <span className={css.previewBadge}>{t('hero.preview')}</span>
         </div>
         <div className={css.body}>
           {/* The resident composer (ConversationRoot's root-owned scrollport;
