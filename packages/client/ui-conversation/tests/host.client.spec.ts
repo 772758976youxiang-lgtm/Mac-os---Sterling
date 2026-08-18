@@ -2,7 +2,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
-  CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR, DEFAULT_SHOW_CONTEXT_INJECTIONS, apply,
+  CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR, DEFAULT_SHOW_CONTEXT_INJECTIONS,
+  DEFAULT_SHOW_TOOL_CALLS, apply,
 } from '@deepseek-ai/dsh-client-ui-conversation'
 
 class MemorySettings extends SettingsProvider {
@@ -23,11 +24,16 @@ describe('ui-conversation host', () => {
     expect(ctx.settings.get(ns)).toEqual({
       busyEnter: DEFAULT_BUSY_ENTER_BEHAVIOR,
       showContextInjections: DEFAULT_SHOW_CONTEXT_INJECTIONS,
+      showToolCalls: DEFAULT_SHOW_TOOL_CALLS,
     })
     await ctx.settings.update(ns, { busyEnter: 'steer' })
-    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer', showContextInjections: true })
+    expect(ctx.settings.get(ns)).toEqual({
+      busyEnter: 'steer', showContextInjections: true, showToolCalls: true,
+    })
     await ctx.settings.update(ns, { showContextInjections: false })
-    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer', showContextInjections: false })
+    expect(ctx.settings.get(ns)).toEqual({
+      busyEnter: 'steer', showContextInjections: false, showToolCalls: true,
+    })
     await expect(ctx.settings.update(ns, { busyEnter: 'invalid' })).rejects.toThrow()
     await fiber.dispose()
     expect(ctx.settings.describe().map(row => row.ns)).not.toContain(ns)

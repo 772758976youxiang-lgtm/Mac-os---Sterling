@@ -15,6 +15,14 @@ import type { PermissionSettingsKey } from './locales.ts'
 import { FULL_ACCESS_PRESET } from './presentation.ts'
 import css from './PermissionRow.module.css'
 
+/** Localized label for a shipped preset; unknown presets keep the store label. */
+function presetLabel(option: { id: string; label: string }, t: PermissionRowProps['t']): string {
+  if (option.id === FULL_ACCESS_PRESET) return t('permission.fullAccess')
+  if (option.id === 'read-only') return t('permission.readOnly')
+  if (option.id === 'workspace-write') return t('permission.workspaceWrite')
+  return option.label
+}
+
 /** Registration-side business face for the host-backed preference. */
 export interface PermissionRowInjected {
   hooks: {
@@ -58,8 +66,9 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
   if (state.status === 'unavailable') return null
   const selected = state.options.find(option => option.id === state.currentValue)
   const busy = state.status === 'loading' || state.status === 'saving' || confirmingFullAccess
-  const label = selected?.label
-    ?? (busy ? t('loading') : t('unavailable'))
+  const label = selected === undefined
+    ? (busy ? t('loading') : t('unavailable'))
+    : presetLabel(selected, t)
   const description: string = state.error ?? t('description')
 
   return (
@@ -72,7 +81,7 @@ export function PermissionRow({ load, select, usePermission, t }: PermissionRowP
         <Menu
           open={open}
           onClose={() => { setOpen(false) }}
-          items={state.options.map(option => ({ id: option.id, label: option.label }))}
+          items={state.options.map(option => ({ id: option.id, label: presetLabel(option, t) }))}
           selectedId={state.currentValue}
           onSelect={(id) => {
             setOpen(false)

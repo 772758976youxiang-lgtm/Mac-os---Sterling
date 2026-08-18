@@ -58,7 +58,7 @@ function optionsOf(value: PermissionSelect, t: (key: string) => string): SelectO
     .filter(option => option.value !== 'custom')
     .map(option => ({
       id: option.value,
-      label: displayPermissionPreset(option.value, option.name),
+      label: displayPermissionPreset(option.value, option.name, t),
       ...(option.description !== undefined ? { detail: option.description } : {}),
       ...(option.value === value.currentValue ? { active: true } : {}),
       ...(option.value === FULL_ACCESS_PRESET
@@ -94,6 +94,9 @@ export function apply(ctx: ClientContext): void {
         'confirm.acknowledge': accessZh['confirm.acknowledge'],
         'confirm.cancel': accessZh['confirm.cancel'],
         'confirm.enable': accessZh['confirm.enable'],
+        'permission.readOnly': accessZh['permission.readOnly'],
+        'permission.workspaceWrite': accessZh['permission.workspaceWrite'],
+        'permission.fullAccess': accessZh['permission.fullAccess'],
       }),
       ctx.locale.register(ACCESS_NS, 'en', {
         'confirm.title': accessEn['confirm.title'],
@@ -101,6 +104,9 @@ export function apply(ctx: ClientContext): void {
         'confirm.acknowledge': accessEn['confirm.acknowledge'],
         'confirm.cancel': accessEn['confirm.cancel'],
         'confirm.enable': accessEn['confirm.enable'],
+        'permission.readOnly': accessEn['permission.readOnly'],
+        'permission.workspaceWrite': accessEn['permission.workspaceWrite'],
+        'permission.fullAccess': accessEn['permission.fullAccess'],
       }),
     ]
     return () => { for (const dispose of disposers) dispose() }

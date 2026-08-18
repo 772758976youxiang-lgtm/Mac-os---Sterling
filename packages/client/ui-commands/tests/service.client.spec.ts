@@ -65,6 +65,13 @@ async function carried<T>(produce: () => Promise<T>) {
 
 async function bench(opts: BenchOptions = {}) {
   const ctx = new Context()
+  // The service reads the command-namespace locale for shipped descriptions;
+  // a keyless translate keeps fixture descriptions verbatim.
+  ctx.provide('locale', {
+    bind: () => (key: string) => key,
+    getSnapshot: () => ({ active: 'zh', locales: [], revision: 0 }),
+    subscribe: () => () => {},
+  } as never)
   const registered = new Map<string, InputTriggerSource>()
   const listCalls: Array<{ sessionId: SessionId }> = []
   const executeCalls: Array<{ sessionId: SessionId; line: string }> = []

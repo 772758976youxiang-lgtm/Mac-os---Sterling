@@ -97,6 +97,7 @@ describe('apply wiring', () => {
     expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual([
       'composer-enter',
       'context-injection-visibility',
+      'tool-call-visibility',
     ])
     await b.runtime.dispose()
   })

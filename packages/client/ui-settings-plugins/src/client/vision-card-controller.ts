@@ -10,7 +10,6 @@ export const MCP_IMAGE_GENERATION_NS = 'mcp-image-generation'
 /** Protocol choices shared with the model-provider configuration surface. */
 export const VISION_API_PROTOCOLS = [
   'openai-completions',
-  'minimax-h3',
   'openai-responses',
   'anthropic-messages',
   'openai-image-generations',

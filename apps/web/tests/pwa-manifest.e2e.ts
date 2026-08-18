@@ -19,7 +19,7 @@ it('ships install metadata with the built web application', async () => {
     display: 'fullscreen',
     icons: [{
       src: '/sterling-icon.png',
-      sizes: '1254x1254',
+      sizes: '1454x1454',
       type: 'image/png',
       purpose: 'any',
     }],

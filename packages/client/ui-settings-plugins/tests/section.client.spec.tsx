@@ -19,6 +19,8 @@ import { PluginsSettingsSection } from '../src/client/PluginsSettingsSection.tsx
 import type { PluginsSettingsSectionProps, PluginsSettingsTabEntry } from '../src/client/PluginsSettingsSection.tsx'
 import { VisionCard } from '../src/client/VisionCard.tsx'
 import type { VisionCardProps } from '../src/client/VisionCard.tsx'
+import { ImageGenerationCard } from '../src/client/ImageGenerationCard.tsx'
+import type { ImageGenerationCardProps } from '../src/client/ImageGenerationCard.tsx'
 import { WebSearchCard } from '../src/client/WebSearchCard.tsx'
 import type { WebSearchCardProps } from '../src/client/WebSearchCard.tsx'
 import type { AgentLoopCardState } from '../src/client/agent-loop-card-controller.ts'
@@ -26,6 +28,7 @@ import type { BashCardState } from '../src/client/bash-card-controller.ts'
 import type { CardFieldState, CardShell } from '../src/client/card-form.ts'
 import type { WebSearchCardState } from '../src/client/web-search-card-controller.ts'
 import type { VisionSettingsState } from '../src/client/vision-card-controller.ts'
+import type { ImageSettingsState } from '../src/client/image-card-controller.ts'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -100,6 +103,25 @@ function renderVision(state: Partial<VisionSettingsState> = {}) {
   const actions = cardActions()
   const props = { ...actions, t, useVisionSettings: bindSnapshotSelector(store) } as unknown as VisionCardProps
   render(<VisionCard {...props} />)
+  return actions
+}
+
+function renderImage(state: Partial<ImageSettingsState> = {}) {
+  const store = createSnapshotStore<ImageSettingsState>({
+    ...settled,
+    provider: 'acme-images',
+    displayName: 'Acme Images',
+    baseURL: 'https://gateway.example/v1',
+    api: 'openai-image-generations',
+    model: 'image-gen-2',
+    apiKeyDraft: '',
+    apiKeyConfigured: false,
+    apiKeyWritable: true,
+    ...state,
+  })
+  const actions = cardActions()
+  const props = { ...actions, t, useImageSettings: bindSnapshotSelector(store) } as unknown as ImageGenerationCardProps
+  render(<ImageGenerationCard {...props} />)
   return actions
 }
 
@@ -431,7 +453,7 @@ describe('VisionCard', () => {
 
     fireEvent.click(screen.getByText(en.visionTitle))
     expect([...screen.getByLabelText(en.visionApi).querySelectorAll('option')].map(option => option.value)).toEqual([
-      'openai-completions', 'minimax-h3', 'openai-responses', 'anthropic-messages', 'openai-image-generations',
+      'openai-completions', 'openai-responses', 'anthropic-messages', 'openai-image-generations',
     ])
     fireEvent.change(screen.getByLabelText(en.visionProvider), { target: { value: 'acme-gateway' } })
     fireEvent.change(screen.getByLabelText(en.visionBaseUrl), { target: { value: 'https://gateway.example/v1' } })
@@ -449,5 +471,35 @@ describe('VisionCard', () => {
     renderVision({ available: false })
 
     expect(screen.queryByText(en.visionTitle)).toBeNull()
+  })
+})
+
+describe('ImageGenerationCard', () => {
+  it('renders a custom provider form and stages fields only when expanded', () => {
+    const actions = renderImage()
+
+    expect(screen.getByText(en.imageTitle)).toBeTruthy()
+    expect(screen.queryByLabelText(en.imageProvider)).toBeNull()
+
+    fireEvent.click(screen.getByText(en.imageTitle))
+    expect([...screen.getByLabelText(en.imageApi).querySelectorAll('option')].map(option => option.value)).toEqual([
+      'openai-completions', 'openai-responses', 'anthropic-messages', 'openai-image-generations',
+    ])
+    fireEvent.change(screen.getByLabelText(en.imageProvider), { target: { value: 'acme-gateway' } })
+    fireEvent.change(screen.getByLabelText(en.imageBaseUrl), { target: { value: 'https://other.example/v1' } })
+    fireEvent.change(screen.getByLabelText(en.imageModel), { target: { value: 'image-gen-3' } })
+
+    expect(actions.edit.mock.calls).toEqual([
+      ['provider', 'acme-gateway'],
+      ['baseURL', 'https://other.example/v1'],
+      ['model', 'image-gen-3'],
+    ])
+    expect(screen.getByText(en.imageHint)).toBeTruthy()
+  })
+
+  it('does not render while the image-generation namespace is unavailable', () => {
+    renderImage({ available: false })
+
+    expect(screen.queryByText(en.imageTitle)).toBeNull()
   })
 })

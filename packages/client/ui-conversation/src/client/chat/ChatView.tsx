@@ -95,16 +95,20 @@ function scrollPosition(list: HTMLElement, scrollport: HTMLElement): ChatScrollP
   }
 }
 
-function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | null {
-  let latest: number | null = null
+/** The open turn's start time and whether the window holds a turn whose `turn/end` has not arrived. */
+function runningTurnSignal(timeline: ConversationTimelineSnapshot): { startTime: number | null; open: boolean } {
+  let startTime: number | null = null
+  let open = false
   for (const turn of timeline.turns.values()) {
-    if (turn.status === 'open' && turn.start !== undefined) latest = turn.start.time
+    if (turn.status !== 'open') continue
+    open = true
+    if (turn.start !== undefined) startTime = turn.start.time
   }
-  return latest
+  return { startTime, open }
 }
 
 /** Cute, relaxed status phrases rotated while a turn is actively running. */
-const TURN_STATUS_PHRASES = ['埋头苦干中', '脑袋冒烟中', '小宇宙爆发', '挖呀挖呀挖'] as const
+const TURN_STATUS_PHRASES = ['埋头苦干中…', '脑袋冒烟中…', '小宇宙爆发…', '挖呀挖呀挖…'] as const
 /** One carousel slot per phrase; every slot the elapsed clock ticks 3 times. */
 const TURN_STATUS_PHRASE_MS = 3_000
 
@@ -158,7 +162,7 @@ function TurnStatus({ startTime, t }: {
  */
 export function ChatView({
   useSession, useSessions, useStore, renderSlot, sessionId, openFile, loadOlder, loadImage, inspectCall, chatScroll, forkAt,
-  fileMentions, useShowContextInjections, t,
+  fileMentions, useShowContextInjections, useShowToolCalls, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
@@ -173,12 +177,13 @@ export function ChatView({
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
   const showContextInjections = useShowContextInjections(value => value)
+  const showToolCalls = useShowToolCalls(value => value)
 
   const pendingSteering = useMemo(
     () => inbox.filter(item => item.placement === 'steering'),
     [inbox],
   )
-  const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
+  const runningTurn = useMemo(() => runningTurnSignal(timeline), [timeline])
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -398,6 +403,7 @@ export function ChatView({
               key={nodeKey}
               nodeKey={nodeKey}
               showContextInjections={showContextInjections}
+              showToolCalls={showToolCalls}
               useSession={useSession}
               selectedCallId={selectedCallId}
               cwd={cwd}
@@ -414,8 +420,12 @@ export function ChatView({
               (ApprovalPanel) both take over the composer, so a flow card would
               double-render the same wait. */}
           {/* Turn-level loading signal: rides the whole running turn (first-token
-              wait, tool execution, streaming) so it never flickers per step. */}
-          {running && <TurnStatus startTime={runningTurnStart} t={t} />}
+              wait, tool execution, streaming) so it never flickers per step. It
+              stays visible while the turn is open in the window even when the
+              running-bit relay is missed or raced (a mid-turn reload, a dropped
+              frame): the open-turn boundary comes from the event log, which the
+              relay cannot lose. */}
+          {(running || runningTurn.open) && <TurnStatus startTime={runningTurn.startTime} t={t} />}
           {pendingSteering.map(item => (
             <PendingSteeringBubble key={item.id} content={item.content} loadImage={loadImage} t={t} />
           ))}

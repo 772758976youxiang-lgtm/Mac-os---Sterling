@@ -14,7 +14,7 @@ import { IconBrowseOutline16, IconGlobeOutline14 } from '@deepseek-ai/dsh-client
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
 import { webCardModel } from '../models/web-card-model.ts'
-import { toolRowModel } from '../models/tool-call-model.ts'
+import { toolRowModel, localizeToolTitle } from '../models/tool-call-model.ts'
 import { ToolRow } from '../components/ToolRow.tsx'
 import { CONVERSATION_NS as NS } from '../../locale.ts'
 
@@ -43,7 +43,7 @@ export function WebRow({ toolName, block, inspect, t }: WebRowProps) {
       variant={model.variant}
       toolName={toolName}
       icon={icon}
-      title={WEB_TITLES[toolName] ?? model.title}
+      title={localizeToolTitle(t, model.variant, WEB_TITLES[toolName] ?? model.title)}
       summary={model.summary}
       body={null}
       output={model.output}

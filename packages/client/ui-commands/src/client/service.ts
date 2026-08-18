@@ -12,6 +12,8 @@ import type { Context } from '@deepseek-ai/cordis'
 // Type-only: pulls the ctx.remote merge and the forwarded-event key face
 // (`commands/change` rides the allowlist) into this program.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls the locale plugin's Context merge (ctx.locale).
+import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { CommandResult } from '@deepseek-ai/dsh-commands/types'
 import type { ClientContext, ISessions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
@@ -23,6 +25,17 @@ import type { CommandDescriptor } from './directory.ts'
 import { CommandDirectory } from './directory.ts'
 import { PopupSelectController } from './popup.ts'
 import type { TokenSegment } from './popup.ts'
+
+/** Shipped host commands whose English host description is localized in the menu,
+ *  keyed by the exact host literal so fixture or contributed commands pass through. */
+const HOST_COMMAND_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  'Compact older conversation history': 'desc.compact',
+  'Download this Session log as a ZIP archive': 'desc.export',
+  'record feedback about this session': 'desc.feedback',
+  'set or view the goal for a long-running task': 'desc.goal',
+  'Switch the permission preset (sandbox mode + approval policy)': 'desc.permission',
+  'Enter or leave plan mode': 'desc.plan',
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -242,11 +255,19 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
   /** Menu candidates: host catalog + contribution availability, then position filtering and fuzzy name ranking. */
   private async candidates(session: ClientSessionContext, req: CandidateRequest): Promise<readonly InputTriggerCandidate[]> {
     const list = await this.directory.ensureReady(session.sessionId, req.signal)
+    // Host command descriptions are English host literals; the menu renders
+    // the localized copy for the shipped commands and the host text otherwise.
+    const t = this.ctx.locale.bind('command')
     const rows: InputTriggerCandidate[] = []
     const seen = new Set<string>()
     for (const c of list) {
       seen.add(c.name)
-      rows.push({ name: c.name, description: c.description, ...(c.input !== undefined ? { hint: c.input.hint } : {}) })
+      const key = HOST_COMMAND_DESCRIPTIONS[c.description]
+      rows.push({
+        name: c.name,
+        description: key === undefined ? c.description : t(key as 'desc.plan'),
+        ...(c.input !== undefined ? { hint: c.input.hint } : {}),
+      })
     }
     for (const contribution of this.live.contributions.values()) {
       if (!contribution.available(session)) continue

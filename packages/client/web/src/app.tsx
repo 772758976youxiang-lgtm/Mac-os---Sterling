@@ -7,8 +7,6 @@
  */
 import type { ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
-import { DocumentTitle } from './DocumentTitle.tsx'
 // Type-only: pulls the runtime's SlotMap declaration merge (the 'root' key) into this program.
 import type {} from '@deepseek-ai/dsh-client-runtime/client'
 
@@ -25,20 +23,9 @@ export interface AssemblyDeps {
  */
 export function buildRenderApp(deps: AssemblyDeps): () => ReactNode {
   const { ctx } = deps
-  const sessions = ctx.get('sessions')
-  if (sessions === undefined) throw new Error('shell assembly: sessions service unavailable')
-  const useSessions = bindSnapshotSelector(sessions.list)
-  const SessionDocumentTitle = (): ReactNode => {
-    const title = useSessions((state) => {
-      const id = state.current
-      return id === undefined ? undefined : state.byId[id]?.title
-    })
-    return <DocumentTitle {...title === undefined ? {} : { title }} />
-  }
-  return () => (
-    <>
-      <SessionDocumentTitle />
-      {ctx.slots.renderSlot('root', {})}
-    </>
-  )
+  if (ctx.get('sessions') === undefined) throw new Error('shell assembly: sessions service unavailable')
+  // The OS window title stays the product name ("Sterling Harness") from the
+  // document head; a session title is transcript content, not window chrome,
+  // so it is never projected into the browser title.
+  return () => ctx.slots.renderSlot('root', {})
 }

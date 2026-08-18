@@ -44,7 +44,6 @@
         - text: API 协议
         - combobox "API 协议":
           - option "openai-completions" [selected]
-          - option "minimax-h3"
           - option "openai-responses"
           - option "anthropic-messages"
           - option "openai-image-generations"

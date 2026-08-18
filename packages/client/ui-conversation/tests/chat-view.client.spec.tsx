@@ -166,6 +166,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   // production; the view reads it through the PropsStore useStore share).
   const chat = createChatStore().create()
   const showContextInjections = createSnapshotStore(true)
+  const showToolCalls = createSnapshotStore(true)
   const t = makeTranslate(zh, commonZh)
   const toolOwners: Array<{
     callId: string
@@ -279,6 +280,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     },
     useStore: bindSnapshotSelector(chat),
     useShowContextInjections: bindSnapshotSelector(showContextInjections),
+    useShowToolCalls: bindSnapshotSelector(showToolCalls),
     actions: chat.actions,
     renderSlot,
     SessionProvider: SessionProviderStub,
@@ -297,7 +299,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   const setSelection = (next: SelectionTarget | null): void => { chat.actions.select(next) }
   return {
     set, ChatView, props, openDetails, openFile, loadOlder, inspectCall,
-    chatScroll, forkAt, setSelection, showContextInjections, toolOwners,
+    chatScroll, forkAt, setSelection, showContextInjections, showToolCalls, toolOwners,
   }
 }
 
@@ -604,7 +606,12 @@ describe('ChatView', () => {
   })
 
   it('renders terminal turn failures inline with their durable message and optional code', () => {
-    const h = makeHarness({ nodes: [user(1, 'try'), turnError(2, 'AUTH'), turnError(3)] })
+    const h = makeHarness({
+      nodes: [user(1, 'try'), turnError(2, 'AUTH'), turnError(3)],
+      // The error turn ended (turn/end error), so it is not open in the
+      // timeline and must not keep the running-turn status visible.
+      turnEnds: new Map([[1, 4]]),
+    })
     const view = render(<h.ChatView {...h.props} />)
     const statuses = view.getAllByRole('status')
     expect(statuses.map(status => status.textContent)).toEqual([
@@ -614,7 +621,10 @@ describe('ChatView', () => {
   })
 
   it('renders the max-tokens notice with localized guidance, distinct from turn errors', () => {
-    const h = makeHarness({ nodes: [user(1, 'try'), assistant(2, 'truncated'), turnMaxTokens(3)] })
+    const h = makeHarness({
+      nodes: [user(1, 'try'), assistant(2, 'truncated'), turnMaxTokens(3)],
+      turnEnds: new Map([[1, 4]]),
+    })
     const view = render(<h.ChatView {...h.props} />)
     const statuses = view.getAllByRole('status')
     expect(statuses.map(status => status.textContent)).toEqual([
@@ -898,7 +908,44 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     expect(view.getByTestId('tool-seat-r1')).toBeTruthy()
     expect(h.toolOwners[0]?.block).toMatchObject({ callId: 'r1', argsRaw: '{"command":"cmd-r1"}' })
-    expect(view.getByRole('status').textContent).toMatch(/^(埋头苦干中|脑袋冒烟中|小宇宙爆发|挖呀挖呀挖)$/)
+    expect(view.getByRole('status').textContent).toMatch(/^(埋头苦干中…|脑袋冒烟中…|小宇宙爆发…|挖呀挖呀挖…)$/)
+  })
+
+  it('hides settled tool-call rows while the show-tool-calls preference is off', () => {
+    const h = makeHarness({ nodes: [user(1, 'q'), toolResult(3, 'r1'), assistant(4, 'done')] })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByTestId('tool-seat-r1')).toBeTruthy()
+    expect(view.getByText('done')).toBeTruthy()
+
+    act(() => { h.showToolCalls.set(false) })
+    // The tool row disappears without taking the assistant reply with it.
+    expect(view.queryByTestId('tool-seat-r1')).toBeNull()
+    expect(view.getByText('done')).toBeTruthy()
+
+    act(() => { h.showToolCalls.set(true) })
+    expect(view.getByTestId('tool-seat-r1')).toBeTruthy()
+  })
+
+  it('keeps generated images visible when the show-tool-calls preference is off', () => {
+    const generated = {
+      attachmentId: 'sha256:generated' as never,
+      mediaType: 'image/png' as const, bytes: 9, width: 3, height: 3, name: 'generated.png',
+    }
+    const h = makeHarness({
+      nodes: [
+        user(1, 'q'),
+        { ...toolResult(3, 'r1'), meta: { images: [generated] } } as never,
+        assistant(4, 'done'),
+      ],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByTestId('tool-seat-r1')).toBeTruthy()
+
+    act(() => { h.showToolCalls.set(false) })
+    // The tool chrome disappears, but the produced image stays as a gallery.
+    expect(view.queryByTestId('tool-seat-r1')).toBeNull()
+    expect(view.container.querySelector('[data-chat-flow-kind="tool-call"]')).not.toBeNull()
+    expect(view.getByText('done')).toBeTruthy()
   })
 
   it('keeps the Tool renderer mounted when a running call settles into log order', () => {
@@ -958,7 +1005,7 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     // Freshly mounted (as after a reload) yet already past the 15s gate.
     const status = view.getByRole('status')
-    expect(status.textContent).toMatch(/^(埋头苦干中|脑袋冒烟中|小宇宙爆发|挖呀挖呀挖)2分0\d秒$/)
+    expect(status.textContent).toMatch(/^(埋头苦干中…|脑袋冒烟中…|小宇宙爆发…|挖呀挖呀挖…)2分0\d秒$/)
     expect(status.querySelector('[aria-hidden="true"]')).not.toBeNull()
     act(() => {
       h.set({ queue: [{
@@ -970,7 +1017,20 @@ describe('ChatView', () => {
         text: 'also',
       }] })
     })
-    expect(status.textContent).toMatch(/^(埋头苦干中|脑袋冒烟中|小宇宙爆发|挖呀挖呀挖)2分0\d秒$/)
+    expect(status.textContent).toMatch(/^(埋头苦干中…|脑袋冒烟中…|小宇宙爆发…|挖呀挖呀挖…)2分0\d秒$/)
+  })
+
+  it('keeps the turn status visible from the open-turn log when the running relay missed the flip', () => {
+    // The running bit rides a live status frame; a missed or raced frame (a
+    // mid-turn reload, a drop) leaves it false while the turn runs. The open
+    // turn in the event log is the durable signal, so the status stays up.
+    const startTime = Date.now() - 125_000
+    const h = makeHarness({
+      turnTimings: new Map([[1, { startTime }]]), running: false,
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    const status = view.getByRole('status')
+    expect(status.textContent).toMatch(/^(埋头苦干中…|脑袋冒烟中…|小宇宙爆发…|挖呀挖呀挖…)2分0\d秒$/)
   })
 
   it('hands each ordered root call to the keyed business-node slot', () => {

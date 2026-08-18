@@ -50,19 +50,19 @@ describe('ComposerSubmissionPolicy', () => {
     const host = stubSettingsScope<ConversationSettings>()
     const policy = new ComposerSubmissionPolicy(host.scope)
     host.publish({
-      status: 'ready', value: { busyEnter: 'steer', showContextInjections: true }, revision: 1, writable: true,
+      status: 'ready', value: { busyEnter: 'steer', showContextInjections: true, showToolCalls: true }, revision: 1, writable: true,
     })
     expect(policy.busyEnter.getSnapshot()).toBe('steer')
     policy.setBusyEnter('steer')
     expect(host.set).not.toHaveBeenCalled()
-    host.publish({ value: { busyEnter: 'steer', showContextInjections: true }, revision: 2 })
+    host.publish({ value: { busyEnter: 'steer', showContextInjections: true, showToolCalls: true }, revision: 2 })
     expect(policy.busyEnter.getSnapshot()).toBe('steer')
   })
 
   it('adopts a section already standing at construction', () => {
     const host = stubSettingsScope<ConversationSettings>()
     host.publish({
-      status: 'ready', value: { busyEnter: 'steer', showContextInjections: true }, revision: 1, writable: true,
+      status: 'ready', value: { busyEnter: 'steer', showContextInjections: true, showToolCalls: true }, revision: 1, writable: true,
     })
     const policy = new ComposerSubmissionPolicy(host.scope)
     expect(policy.busyEnter.getSnapshot()).toBe('steer')

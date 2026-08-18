@@ -275,7 +275,6 @@ function referencedImage(events: readonly SessionEvent[], attachmentId: string):
  * configuration boundary or the pickers silently fail to persist.
  */
 const PRODUCT_SETTINGS_NAMESPACES = new Set([
-  'ui-onboarding',
   AGENT_PRESET_SETTINGS_NAMESPACE,
   // The local image MCP owns the Qwen vision model and its credential reference.
   'mcp-image-generation',

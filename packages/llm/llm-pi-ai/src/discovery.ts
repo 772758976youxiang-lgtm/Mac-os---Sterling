@@ -50,7 +50,6 @@ import type { PiAiReasoningEfforts } from './catalog.ts'
  */
 const LISTABLE_PROTOCOLS: ReadonlySet<string> = new Set([
   'openai-completions',
-  'minimax-h3',
   'openai-responses',
   'openai-image-generations',
 ])

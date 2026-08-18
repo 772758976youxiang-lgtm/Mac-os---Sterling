@@ -88,11 +88,6 @@ const MARKDOWN_FIXTURE = [
 
 const USER_MARKDOWN_LITERAL = '用户字面量：# 不渲染 `code` [link](https://example.com)'
 
-/** Settings address used by the fixture's versioned welcome acknowledgement. */
-const FIXTURE_ONBOARDING_SETTINGS_NAMESPACE = 'ui-onboarding'
-/** Welcome acknowledgement field exposed by the fixture settings descriptor. */
-const FIXTURE_WELCOME_NOTICE_FIELD = 'welcomeNoticeVersion'
-
 /**
  * SGR wrapper for the terminal output sample below: authoring the escapes as
  * `\u001b` keeps literal control bytes out of this source file.
@@ -1551,14 +1546,11 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     // DeepSeek route so unrelated GUI journeys do not enter first-run setup.
     ['DEEPSEEK_API_KEY', true],
   ])
-  let fixtureWelcomeNoticeVersion: string | undefined
-  let fixtureWelcomeNoticeRevision = 0
   /**
    * Preset compositions the fixture serves. Held as state rather than
    * constants so the settings editor's save and delete are exercisable: the
    * roster a GUI journey sees after writing is the text it wrote.
-   */
-  const fixturePresets = new Map<string, { trust: 'system' | 'user'; content: string }>([
+   */  const fixturePresets = new Map<string, { trust: 'system' | 'user'; content: string }>([
     ['standard', { trust: 'system', content: "- id: tool-bash\n  name: '@deepseek-ai/dsh-tool-bash'\n" }],
     ['minimal', { trust: 'system', content: "- id: tool-web-search\n  name: '@deepseek-ai/dsh-tool-web-search'\n" }],
     ['my-agent', { trust: 'user', content: "- id: tool-read\n  name: '@deepseek-ai/dsh-tool-read'\n" }],
@@ -2940,8 +2932,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       },
     },
     settings: {
-      // Fixture-backed journeys need the DeepSeek readiness address and the
-      // versioned acknowledgement that releases the initial welcome notice.
+      // Fixture-backed journeys need the DeepSeek readiness address.
       describe: request => ok(request, {
         writable: true,
         hasDocument: true,
@@ -2953,16 +2944,6 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
             applies: 'live',
             secrets: [{ path: ['apiKey'], set: false }],
             revision: 0,
-          },
-          {
-            ns: FIXTURE_ONBOARDING_SETTINGS_NAMESPACE,
-            schema: {},
-            value: fixtureWelcomeNoticeVersion === undefined
-              ? {}
-              : { [FIXTURE_WELCOME_NOTICE_FIELD]: fixtureWelcomeNoticeVersion },
-            applies: 'live',
-            secrets: [],
-            revision: fixtureWelcomeNoticeRevision,
           },
         ],
       }),
@@ -2978,34 +2959,11 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         message: 'fixture: the minimal readiness settings descriptor is read-only',
         details: { ns: request.payload.ns },
       }),
-      mutate: (request) => {
-        const { ns, ops } = request.payload
-        const [op] = ops
-        if (
-          ns !== FIXTURE_ONBOARDING_SETTINGS_NAMESPACE
-          || ops.length !== 1
-          || op?.op !== 'set'
-          || op.path.length !== 1
-          || op.path[0] !== FIXTURE_WELCOME_NOTICE_FIELD
-          || typeof op.value !== 'string'
-        ) {
-          return err(request, {
-            code: 'settings-rejected',
-            message: 'fixture: only the welcome acknowledgement can be saved',
-            details: { ns },
-          })
-        }
-        fixtureWelcomeNoticeVersion = op.value
-        fixtureWelcomeNoticeRevision++
-        return ok(request, {
-          ns: FIXTURE_ONBOARDING_SETTINGS_NAMESPACE,
-          schema: {},
-          value: { [FIXTURE_WELCOME_NOTICE_FIELD]: fixtureWelcomeNoticeVersion },
-          applies: 'live' as const,
-          secrets: [],
-          revision: fixtureWelcomeNoticeRevision,
-        })
-      },
+      mutate: (request) => err(request, {
+        code: 'settings-rejected',
+        message: 'fixture: the minimal readiness settings descriptor is read-only',
+        details: { ns: request.payload.ns },
+      }),
     },
     credentials: {
       describe: request => ok(request, {

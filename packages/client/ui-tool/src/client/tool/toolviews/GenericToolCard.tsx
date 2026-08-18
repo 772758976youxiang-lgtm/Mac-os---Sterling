@@ -14,7 +14,7 @@ import { diffCardModel } from '../models/diff-card-model.ts'
 import { searchCardModel } from '../models/search-card-model.ts'
 import { terminalCardModel, terminalFailed } from '../models/terminal-card-model.ts'
 import { webCardModel } from '../models/web-card-model.ts'
-import { toolRowModel, type ToolRowVariant } from '../models/tool-call-model.ts'
+import { toolRowModel, localizeToolTitle, type ToolRowVariant } from '../models/tool-call-model.ts'
 import { ToolRow } from '../components/ToolRow.tsx'
 
 /** Variant leading icons (figma table); all glyphs render at 14 inside the 16px leading box. */
@@ -35,6 +35,7 @@ export interface GenericToolCardProps extends ToolCallOwnerProps {
 
 export function GenericToolCard({ toolName, block, cwd, openFile, inspect, t }: GenericToolCardProps) {
   const model = toolRowModel(toolName, block, cwd)
+  const title = localizeToolTitle(t, model.variant, model.title)
   const terminal = terminalCardModel(block, cwd)
   const read = readCardModel(block, cwd)
   const diff = diffCardModel(block)
@@ -52,7 +53,7 @@ export function GenericToolCard({ toolName, block, cwd, openFile, inspect, t }: 
       variant={model.variant}
       toolName={toolName}
       icon={VARIANT_ICONS[model.variant]}
-      title={model.title}
+      title={title}
       // A terminal presenter's description is the contract's above-card text, so
       // it outranks the args-derived summary here exactly as it does in BashRow;
       // a search result view's replacement title outranks it the same way.

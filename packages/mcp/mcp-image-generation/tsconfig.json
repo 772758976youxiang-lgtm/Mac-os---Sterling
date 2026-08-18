@@ -9,6 +9,7 @@
     { "path": "../../credentials/credentials" },
     { "path": "../../util/launch-environment" },
     { "path": "../../llm/llm" },
+    { "path": "../../llm/llm-pi-ai" },
     { "path": "../../settings/settings" },
     { "path": "../../core/tools" },
     { "path": "../../runtime-diagnostics/invariants" }

@@ -192,17 +192,6 @@ describe('draft-provider model discovery', () => {
     expect(server.paths).toEqual(['/models'])
   })
 
-  it('reads a MiniMax H3 route through the OpenAI-compatible model listing endpoint', async () => {
-    const server = await listingServer({ body: JSON.stringify({ data: [{ id: 'MiniMax-H3' }] }) })
-    const ctx = await harness()
-
-    await expect(ctx.llm.discoverModels('llm-pi-ai', {
-      baseURL: server.url, api: 'minimax-h3', apiKey: 'probe-key',
-    })).resolves.toEqual([{ id: 'MiniMax-H3' }])
-    expect(server.paths).toEqual(['/models'])
-    expect(server.headers[0]?.authorization).toBe('Bearer probe-key')
-  })
-
   it('offers no credential when the draft names none', async () => {
     const server = await listingServer({ body: JSON.stringify({ data: [{ id: 'm' }] }) })
     const ctx = await harness()

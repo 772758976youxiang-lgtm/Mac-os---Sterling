@@ -29,6 +29,8 @@ import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
 import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
 import { ContextInjectionVisibilityRow } from './settings/ContextInjectionVisibilityRow.tsx'
 import type { ContextInjectionVisibilityRowInjected } from './settings/ContextInjectionVisibilityRow.tsx'
+import { ToolCallVisibilityRow } from './settings/ToolCallVisibilityRow.tsx'
+import type { ToolCallVisibilityRowInjected } from './settings/ToolCallVisibilityRow.tsx'
 import { ConversationDisplaySettings } from './settings/conversation-display-settings.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { StatsLine } from './chat/StatsLine.tsx'
@@ -159,6 +161,17 @@ export function apply(ctx: Context): void {
       setShowContextInjections: (visible) => { displaySettings.setShowContextInjections(visible) },
     }),
   }, ContextInjectionVisibilityRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'tool-call-visibility',
+    order: 40,
+    locale: NS,
+    inject: (): ToolCallVisibilityRowInjected => ({
+      hooks: { showToolCalls: displaySettings.showToolCalls },
+      setShowToolCalls: (visible) => { displaySettings.setShowToolCalls(visible) },
+    }),
+  }, ToolCallVisibilityRow))
 
   // Chat semantic reader positions by session, surviving view switches and
   // width reflow when the tab ring remounts the view. Deliberately not
@@ -409,7 +422,7 @@ export function apply(ctx: Context): void {
       const conversation = concreteConversation(ctx)
       const scoped = scopedConversation(sessions, sessionId)
       return {
-        hooks: { showContextInjections: displaySettings.showContextInjections },
+        hooks: { showContextInjections: displaySettings.showContextInjections, showToolCalls: displaySettings.showToolCalls },
         openDetails: (target) => {
           actions.select(target)
           layout.openDetails()

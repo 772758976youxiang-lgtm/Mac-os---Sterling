@@ -13,7 +13,7 @@ import { IconEditOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
 import { diffCardModel } from '../models/diff-card-model.ts'
-import { toolRowModel } from '../models/tool-call-model.ts'
+import { toolRowModel, localizeToolTitle } from '../models/tool-call-model.ts'
 import { ToolRow } from '../components/ToolRow.tsx'
 import { CONVERSATION_NS as NS } from '../../locale.ts'
 
@@ -38,7 +38,7 @@ export function FileMutationRow({ toolName, block, cwd, openFile, inspect, t }: 
       variant={model.variant}
       toolName={toolName}
       icon={<IconEditOutline16 size={14} />}
-      title={model.title}
+      title={localizeToolTitle(t, model.variant, model.title)}
       summary={model.summary}
       body={null}
       output={model.output}

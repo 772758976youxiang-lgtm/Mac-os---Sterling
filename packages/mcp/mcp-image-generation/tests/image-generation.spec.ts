@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import { apply, ANALYZE_IMAGE_TOOL, Config, DEFAULT_IMAGE_MODEL, GENERATE_IMAGE_TOOL } from '../src/index.ts'
+import {
+  apply, ANALYZE_IMAGE_TOOL, Config, DEFAULT_IMAGE_MODEL, GENERATE_IMAGE_TOOL, IMAGE_GENERATION_SETTINGS_NAMESPACE,
+} from '../src/index.ts'
 
 const contexts: Context[] = []
 
@@ -13,6 +16,14 @@ afterEach(async () => {
   vi.unstubAllGlobals()
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
 })
+
+class MemorySettings extends SettingsProvider {
+  readonly writable = true
+  protected load(): Promise<Record<string, unknown>> { return Promise.resolve({}) }
+  protected persist(_ns: SettingsNamespace, _section: Record<string, unknown>): Promise<void> {
+    return Promise.resolve()
+  }
+}
 
 function imageChunk(): StreamChunk {
   return {
@@ -30,9 +41,11 @@ function imageChunk(): StreamChunk {
 async function harness(
   hasImageModel = true,
   config: Config = {},
+  withSettings = false,
 ): Promise<{ ctx: Context; requests: GenerateOptions[] }> {
   const ctx = new Context()
   contexts.push(ctx)
+  if (withSettings) await ctx.plugin(MemorySettings).await()
   const requests: GenerateOptions[] = []
   ctx.provide('llm', {
     listProviders: () => [
@@ -45,6 +58,10 @@ async function harness(
         provider: hasImageModel ? 'images' : 'text',
         id: hasImageModel ? DEFAULT_IMAGE_MODEL : 'text-1',
         name: hasImageModel ? 'Image 2' : 'Text 1',
+      }, {
+        provider: hasImageModel ? 'images' : 'text',
+        id: 'dall-e-3',
+        name: 'DALL-E 3',
       }],
     resolveModelInfo: async (provider: string, model: string) => ({
       provider,
@@ -68,6 +85,14 @@ async function harness(
     readImage: async (ref: ImageAttachmentRef) => ({
       ref,
       data: new Uint8Array([1, 2, 3]),
+    }),
+    saveImage: async (input: { data: Uint8Array; mediaType: ImageAttachmentRef['mediaType']; name?: string }) => ({
+      attachmentId: AttachmentId(`sha256:${'b'.repeat(64)}`),
+      mediaType: input.mediaType,
+      bytes: input.data.byteLength,
+      width: 1,
+      height: 1,
+      name: input.name ?? 'generated.png',
     }),
   } as never)
   await ctx.plugin(SystemPrompt)
@@ -107,6 +132,147 @@ describe('mcp-image-generation', () => {
       type: 'text',
       text: 'Generated 1 image with gpt-image-2 on images. The image is already attached to this result and displayed in the conversation; do not search for, copy, or analyze it unless the user explicitly asks.',
     }])
+  })
+
+  it('reads the live settings model instead of the mount-time default', async () => {
+    const { ctx, requests } = await harness(true, { model: DEFAULT_IMAGE_MODEL }, true)
+
+    await ctx.settings.update(settingsNamespace(IMAGE_GENERATION_SETTINGS_NAMESPACE), { model: 'dall-e-3' })
+
+    const result = await ctx.tools.execute({
+      callId: 'image-live-1' as never,
+      name: GENERATE_IMAGE_TOOL,
+      arguments: { prompt: 'a cyan heron', size: '1024x1024', quality: 'high' },
+      signal: AbortSignal.timeout(1_000),
+    })
+
+    expect(requests[0]).toMatchObject({ provider: 'images', model: 'dall-e-3', purpose: 'image-generation' })
+    if (result.isError) throw new Error('expected image generation with the live model')
+  })
+
+  it('generates through a configured custom Image API provider', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ data: [{ b64_json: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).toString('base64') }] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+    const { ctx } = await harness(true, {
+      imageProvider: 'acme-images',
+      imageBaseURL: 'https://image.example/v1',
+      model: 'image-gen-2',
+    })
+
+    const result = await ctx.tools.execute({
+      callId: 'image-custom-1' as never,
+      name: GENERATE_IMAGE_TOOL,
+      arguments: { prompt: 'a ginger cat', size: '1536x1024', quality: 'high', count: 1 },
+      signal: AbortSignal.timeout(1_000),
+    })
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://image.example/v1/images/generations')
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect((request.headers as Record<string, string>)['content-type']).toBe('application/json')
+    const body = JSON.parse(String(request.body))
+    expect(body).toMatchObject({
+      model: 'image-gen-2', prompt: 'a ginger cat', size: '1536x1024', quality: 'high', n: 1, response_format: 'b64_json',
+    })
+    expect(result).toMatchObject({ isError: false })
+    if (result.isError) throw new Error('expected custom-provider image generation success')
+    expect(result.meta).toMatchObject({ provider: 'acme-images', model: 'image-gen-2' })
+  })
+
+  it.each([
+    ['openai-completions', 'https://gateway.example/v1/chat/completions'],
+    ['openai-responses', 'https://gateway.example/v1/responses'],
+    ['anthropic-messages', 'https://gateway.example/v1/messages'],
+  ] as const)('generates through a %s endpoint that returns Image-API-shaped data', async (api, endpoint) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ data: [{ b64_json: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).toString('base64') }] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+    const { ctx } = await harness(true, {
+      imageProvider: 'acme-images',
+      imageBaseURL: 'https://gateway.example/v1',
+      imageApi: api,
+      model: `image-${api}`,
+    })
+
+    const result = await ctx.tools.execute({
+      callId: `image-${api}` as never,
+      name: GENERATE_IMAGE_TOOL,
+      arguments: { prompt: 'a red fox', size: '1024x1024', quality: 'high' },
+      signal: AbortSignal.timeout(1_000),
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(endpoint)
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(body.model).toBe(`image-${api}`)
+    // The model-chosen controls reach the gateway on every protocol.
+    expect(body).toMatchObject({ size: '1024x1024', quality: 'high' })
+    expect(result).toMatchObject({ isError: false })
+    if (result.isError) throw new Error(`expected ${api} image generation success`)
+  })
+
+  it('surfaces the gateway error detail when the custom provider refuses', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ error: { message: 'model gpt is not an image model' } }),
+      { status: 502, headers: { 'content-type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+    const { ctx } = await harness(true, {
+      imageProvider: 'acme-images',
+      imageBaseURL: 'https://rayplus.site/v1',
+      imageApi: 'openai-completions',
+      model: 'gpt',
+    })
+
+    const result = await ctx.tools.execute({
+      callId: 'image-refused-1' as never,
+      name: GENERATE_IMAGE_TOOL,
+      arguments: { prompt: 'a kitten', size: '1024x1024', quality: 'high' },
+      signal: AbortSignal.timeout(1_000),
+    })
+
+    expect(result.isError).toBe(true)
+    if (!result.isError) throw new Error('expected the custom provider to refuse')
+    expect(result.error.message).toContain('https://rayplus.site/v1/chat/completions answered 502')
+    expect(result.error.message).toContain('model gpt is not an image model')
+  })
+
+  it('generates through a chat-completions gateway that returns image URLs', async () => {
+    const chatReply = JSON.stringify({
+      choices: [{
+        message: { content: [{ type: 'image_url', image_url: { url: 'https://img.example/out.png' } }] },
+      }],
+    })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(chatReply, { status: 200, headers: { 'content-type': 'application/json' } }))
+      // The image URL fetch resolves the raster bytes.
+      .mockResolvedValue(new Response(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { ctx } = await harness(true, {
+      imageProvider: 'acme-images',
+      imageBaseURL: 'https://gateway.example/v1',
+      imageApi: 'openai-completions',
+      model: 'image-chat-1',
+    })
+
+    const result = await ctx.tools.execute({
+      callId: 'image-chat-1' as never,
+      name: GENERATE_IMAGE_TOOL,
+      arguments: { prompt: 'a sleeping panda', size: '1024x1024', quality: 'high' },
+      signal: AbortSignal.timeout(1_000),
+    })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://gateway.example/v1/chat/completions')
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
+    expect(body).toMatchObject({
+      model: 'image-chat-1', n: 1, size: '1024x1024', quality: 'high',
+      messages: [{ role: 'user', content: 'a sleeping panda' }],
+    })
+    expect(result).toMatchObject({ isError: false })
   })
 
   it('forwards images from the newest human message past injected runtime context', async () => {
@@ -242,7 +408,7 @@ describe('mcp-image-generation', () => {
   })
 
   it.each([
-    ['minimax-h3', 'https://vision.example/v1/chat/completions'],
+    ['openai-completions', 'https://vision.example/v1/chat/completions'],
     ['openai-responses', 'https://vision.example/v1/responses'],
     ['anthropic-messages', 'https://vision.example/v1/messages'],
   ] as const)('uses the %s visual protocol', async (api, endpoint) => {
@@ -250,7 +416,7 @@ describe('mcp-image-generation', () => {
       ? { output_text: 'A response image.' }
       : api === 'anthropic-messages'
         ? { content: [{ type: 'text', text: 'An Anthropic image.' }] }
-        : { choices: [{ message: { content: 'A MiniMax image.' } }] }
+        : { choices: [{ message: { content: 'A chat image.' } }] }
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), {
       status: 200,
       headers: { 'content-type': 'application/json' },

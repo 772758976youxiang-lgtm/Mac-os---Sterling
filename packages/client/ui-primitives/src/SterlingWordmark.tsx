@@ -22,7 +22,17 @@ export function SterlingWordmark({ size = 24, className }: IconProps) {
       }}
     >
       <SterlingMark size={size} />
-      <span style={{ fontSize: size, fontWeight: 650, letterSpacing: 0 }}>Sterling</span>
+      {/* lineHeight 1.25 keeps descenders (the "g" tail) inside the line box
+          so overflow-hidden hosts (the sidebar brand button) cannot clip it. */}
+      <span style={{
+        fontSize: size,
+        fontWeight: 650,
+        letterSpacing: 0,
+        lineHeight: 1.25,
+        paddingBottom: Math.max(1, Math.round(size * 0.06)),
+      }}>
+        Sterling
+      </span>
       <span
         style={{
           padding: `${Math.max(1, Math.round(size * 0.08))}px ${Math.max(3, Math.round(size * 0.17))}px`,

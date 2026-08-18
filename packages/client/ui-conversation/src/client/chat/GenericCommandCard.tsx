@@ -29,9 +29,43 @@ export interface GenericCommandCardProps extends CommandRowOwnerProps {
   runningSummary?: string | undefined
 }
 
+/** Localized label for a shipped permission preset; unknown presets pass through. */
+function permissionLabel(name: string, t: ChatViewSlotProps['t']): string {
+  if (name === 'read-only') return t('permission.readOnly')
+  if (name === 'workspace-write') return t('permission.workspaceWrite')
+  if (name === 'danger-full-access') return t('permission.fullAccess')
+  return name
+}
+
+/** Localize the `/permission` command's settlement text; other commands pass through. */
+function commandText(command: string, text: string, t: ChatViewSlotProps['t']): string {
+  if (command !== 'permission') return text
+  const preset = (name: string): string => permissionLabel(name, t)
+  if (text.startsWith('preset ')) return t('command.permission.preset', { name: preset(text.slice(7)) })
+  if (text.startsWith('current preset ')) {
+    const current = text.slice(15).split(' (available: ')[0] ?? ''
+    const available = text.match(/\(available: (.*)\)$/)?.[1] ?? ''
+    const sep = t('command.permission.listSeparator')
+    return t('command.permission.current', {
+      current: preset(current),
+      available: available.split(', ').map(preset).join(sep),
+    })
+  }
+  if (text.startsWith('unknown preset ')) {
+    const name = text.slice(15).split('"')[1] ?? ''
+    const available = text.match(/\(available: (.*)\)$/)?.[1] ?? ''
+    const sep = t('command.permission.listSeparator')
+    return t('command.permission.unknown', {
+      name,
+      available: available.split(', ').map(preset).join(sep),
+    })
+  }
+  return text
+}
+
 export function GenericCommandCard({ node, t, runningSummary }: GenericCommandCardProps) {
   const [expanded, setExpanded] = useState(false)
-  const text = node.outcome?.text
+  const text = node.outcome?.text === undefined ? undefined : commandText(node.name ?? '', node.outcome.text, t)
   const summary = node.outcome === null
     ? runningSummary ?? t('command.running')
     : text ?? (node.outcome.kind === 'error' ? t('command.failed') : t('command.done'))
@@ -39,7 +73,9 @@ export function GenericCommandCard({ node, t, runningSummary }: GenericCommandCa
   // and the dispatched line's own `/` and arguments only restate what the
   // settlement text says (`permission · preset workspace-write`). A
   // cross-window node whose run page fell out of the window has no name.
-  const title = node.name ?? t('command.title')
+  const title = node.name === 'permission'
+    ? t('command.permission.title')
+    : (node.name ?? t('command.title'))
   const state = stateOf(node.outcome)
   const body = text !== undefined && text.includes('\n') ? text : null
   const open = expanded && body !== null

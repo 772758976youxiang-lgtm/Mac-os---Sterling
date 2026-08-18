@@ -1188,6 +1188,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-agent-preset AgentPresetRow id \'agent-preset\'',
       'client-ui-conversation EnterBehaviorRow id \'composer-enter\'',
       'client-ui-conversation ContextInjectionVisibilityRow id \'context-injection-visibility\'',
+      'client-ui-conversation ToolCallVisibilityRow id \'tool-call-visibility\'',
       'client-ui-permission-presets PermissionRow id \'permission\'',
       'client-ui-theme AppearanceRow id \'appearance\'',
     ],
@@ -1260,7 +1261,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     slotInject: '',
     declaredBy: 'an entry in \'sidebar.settings\' (client-ui-settings-general), so it exists while that entry is mounted',
     occupants: [
-      'client-ui-settings-models WelcomeNotice id \'welcome-notice\'',
       'client-ui-settings-models DeepSeekOnboardingDialog id \'deepseek-official\'',
     ],
     replaceRisk: 'none',
@@ -1310,6 +1310,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-settings-plugins AgentLoopCard id \'agent-loop\'',
       'client-ui-settings-plugins WebSearchCard id \'web-search\'',
       'client-ui-settings-plugins EmailDigestCard id \'email-digest\'',
+      'client-ui-settings-plugins ImageGenerationCard id \'image-generation\'',
       'client-ui-settings-plugins VisionCard id \'vision\'',
     ],
     replaceRisk: 'none',

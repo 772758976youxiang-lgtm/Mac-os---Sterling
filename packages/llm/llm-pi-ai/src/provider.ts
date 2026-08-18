@@ -28,13 +28,6 @@ import { catalogProvider } from './catalog.ts'
 import { OPENAI_IMAGE_GENERATIONS_API } from './image-generation.ts'
 
 /**
- * MiniMax H3's OpenAI-compatible Chat Completions dialect. The distinct
- * configuration name keeps a provider declaration legible while the
- * implementation uses the protocol MiniMax documents on the wire.
- */
-export const MINIMAX_H3_API = 'minimax-h3'
-
-/**
  * Wire protocols a configured route may name, mapped to pi-ai's lazily loaded
  * implementations. Each entry is the factory that pi-ai's matching provider
  * factory uses, so a hand-declared route reaches exactly the implementation a
@@ -54,7 +47,6 @@ export const MINIMAX_H3_API = 'minimax-h3'
  */
 const PROTOCOLS: Readonly<Record<string, () => ProviderStreams>> = {
   'openai-completions': openAICompletionsApi,
-  [MINIMAX_H3_API]: openAICompletionsApi,
   'openai-responses': openAIResponsesApi,
   'anthropic-messages': anthropicMessagesApi,
   // Image routes still use the chat provider as a model-directory container.

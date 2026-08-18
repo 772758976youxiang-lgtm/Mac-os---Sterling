@@ -201,6 +201,26 @@ function deriveBody(variant: ToolRowVariant, argsRaw: string): string | null {
   return JSON.stringify(parsed, null, 2)
 }
 
+/** The row-title locale keys for the default variant literals. */
+export type ToolTitleKey = 'tool.title.search' | 'tool.title.read' | 'tool.title.bash'
+  | 'tool.title.write' | 'tool.title.edit' | 'tool.title.code' | 'tool.title.others'
+
+/**
+ * Localize a row title that is the default variant literal; a tool-owned
+ * title (a TOOL_TITLES entry) is a design literal and stays as authored.
+ * @param t - conversation locale seat narrowed to the row-title keys.
+ * @param variant - the row's classified variant.
+ * @param title - the model title.
+ * @returns the localized default title, or the authored title untouched.
+ */
+export function localizeToolTitle(
+  t: (key: ToolTitleKey) => string,
+  variant: ToolRowVariant,
+  title: string,
+): string {
+  return title === VARIANT_TITLES[variant] ? t(`tool.title.${variant}` as ToolTitleKey) : title
+}
+
 /**
  * Derive the full row model from a frozen call slice.
  * @param toolName - wire tool name (dispatch-supplied; survives windowless results).

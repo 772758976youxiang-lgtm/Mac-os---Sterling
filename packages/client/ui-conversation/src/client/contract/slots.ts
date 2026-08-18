@@ -676,6 +676,8 @@ export interface ChatViewInjected {
   hooks: {
     /** Whether context-injection records are rendered in the transcript. */
     showContextInjections: SnapshotStore<boolean>
+    /** Whether tool-call records (MCP and friends) are rendered in the transcript. */
+    showToolCalls: SnapshotStore<boolean>
   }
   /** Selection write + details panel opening in one gesture (store action + layout orchestration). */
   openDetails: (target: SelectionTarget) => void

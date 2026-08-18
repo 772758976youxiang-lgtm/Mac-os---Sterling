@@ -23,6 +23,9 @@ export type PluginsSettingsLocaleKey =
   | 'visionBaseUrl' | 'visionApi' | 'visionApiKey' | 'visionApiKeyHint'
   | 'visionConfigured' | 'visionNotConfigured' | 'visionModel'
   | 'visionCustomRequired' | 'visionCustomHint'
+  | 'imageTitle' | 'imageDescription' | 'imageProvider' | 'imageDisplayName' | 'imageBaseUrl'
+  | 'imageApi' | 'imageApiKey' | 'imageApiKeyHint' | 'imageConfigured' | 'imageNotConfigured'
+  | 'imageModel' | 'imageCustomRequired' | 'imageHint'
 
 /** English copy. */
 export const en: Record<PluginsSettingsLocaleKey, string> = {
@@ -99,6 +102,19 @@ export const en: Record<PluginsSettingsLocaleKey, string> = {
   visionModel: 'Model ID',
   visionCustomRequired: 'Enter a valid Provider ID, API endpoint, and Model ID before saving.',
   visionCustomHint: 'This provider sends image understanding requests using the selected API protocol.',
+  imageTitle: 'Image generation',
+  imageDescription: 'Uses a custom OpenAI-compatible provider when a text model needs to generate an image.',
+  imageProvider: 'Provider ID',
+  imageDisplayName: 'Display name',
+  imageBaseUrl: 'API endpoint',
+  imageApi: 'API protocol',
+  imageApiKey: 'API key',
+  imageApiKeyHint: 'Stored outside the settings file. Leave blank to keep the current key.',
+  imageConfigured: 'A key is configured.',
+  imageNotConfigured: 'No key is configured.',
+  imageModel: 'Model ID',
+  imageCustomRequired: 'Enter a valid Provider ID, API endpoint, and Model ID before saving.',
+  imageHint: 'This provider sends image generation requests using the selected API protocol.',
 }
 
 /** Simplified Chinese copy. */
@@ -176,4 +192,17 @@ export const zh: Record<PluginsSettingsLocaleKey, string> = {
   visionModel: '模型 ID',
   visionCustomRequired: '请填写有效的 Provider ID、API 地址和模型 ID 后再保存。',
   visionCustomHint: '视觉识别会根据所选 API 协议发送图片请求。',
+  imageTitle: '图像生成',
+  imageDescription: '文本模型需要生成图片时，使用自定义的 OpenAI 兼容提供方。',
+  imageProvider: 'Provider ID',
+  imageDisplayName: '显示名称',
+  imageBaseUrl: 'API 地址',
+  imageApi: 'API 协议',
+  imageApiKey: 'API 密钥',
+  imageApiKeyHint: '密钥写入凭据存储，不会保存到设置文件。留空表示保留当前密钥。',
+  imageConfigured: '已配置密钥。',
+  imageNotConfigured: '尚未配置密钥。',
+  imageModel: '模型 ID',
+  imageCustomRequired: '请填写有效的 Provider ID、API 地址和模型 ID 后再保存。',
+  imageHint: '图像生成会根据所选 API 协议发送图片请求。',
 }
