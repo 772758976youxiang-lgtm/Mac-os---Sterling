@@ -8,6 +8,7 @@
   config:
     persona: >-
       You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+      请用简体中文进行内部推理和思考（thinking/reasoning）；对外回复使用用户使用的语言。
 
 # The shared module-reload HMR row stays off; the launcher's watch-only
 # fallback still keeps the user patch layers live until the run exits.

@@ -17,6 +17,7 @@
   config:
     persona: >-
       You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+      请用简体中文进行内部推理和思考（thinking/reasoning）；对外回复使用用户使用的语言。
 
 # TODO: Re-enable shared HMR for Web after its reload lifecycle is tested.
 - id: hmr
