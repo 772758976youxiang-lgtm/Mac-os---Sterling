@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { apply, ANALYZE_IMAGE_TOOL, Config, DEFAULT_IMAGE_MODEL, GENERATE_IMAGE_TOOL } from '../src/index.ts'
@@ -9,6 +10,7 @@ import { apply, ANALYZE_IMAGE_TOOL, Config, DEFAULT_IMAGE_MODEL, GENERATE_IMAGE_
 const contexts: Context[] = []
 
 afterEach(async () => {
+  vi.unstubAllGlobals()
   await Promise.all(contexts.splice(0).map(ctx => ctx.fiber.dispose()))
 })
 
@@ -25,28 +27,52 @@ function imageChunk(): StreamChunk {
   }
 }
 
-async function harness(hasImageModel = true): Promise<{ ctx: Context; requests: GenerateOptions[] }> {
+async function harness(
+  hasImageModel = true,
+  config: Config = {},
+): Promise<{ ctx: Context; requests: GenerateOptions[] }> {
   const ctx = new Context()
   contexts.push(ctx)
   const requests: GenerateOptions[] = []
   ctx.provide('llm', {
-    listProviders: () => [{ id: hasImageModel ? 'images' : 'text', name: hasImageModel ? 'Images' : 'Text' }],
-    listModels: async () => [{
-      provider: hasImageModel ? 'images' : 'text',
-      id: hasImageModel ? DEFAULT_IMAGE_MODEL : 'text-1',
-      name: hasImageModel ? 'Image 2' : 'Text 1',
-    }],
+    listProviders: () => [
+      { id: hasImageModel ? 'images' : 'text', name: hasImageModel ? 'Images' : 'Text' },
+      { id: 'vision', name: 'Vision' },
+    ],
+    listModels: async (provider: string) => provider === 'vision'
+      ? [{ provider, id: 'vision-1', name: 'Vision 1', inputModalities: ['text', 'image'] }]
+      : [{
+        provider: hasImageModel ? 'images' : 'text',
+        id: hasImageModel ? DEFAULT_IMAGE_MODEL : 'text-1',
+        name: hasImageModel ? 'Image 2' : 'Text 1',
+      }],
+    resolveModelInfo: async (provider: string, model: string) => ({
+      provider,
+      id: model,
+      name: model,
+      inputModalities: provider === 'vision' ? ['text', 'image'] : ['text'],
+    }),
     async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
       requests.push(options)
+      if (options.provider === 'vision') {
+        yield { type: 'text-delta', index: 0, text: 'A small blue square.' }
+        yield { type: 'finish', reason: { kind: 'stop' } }
+        return
+      }
       yield { type: 'block-start', index: 0, blockType: 'image' }
       yield imageChunk()
       yield { type: 'finish', reason: { kind: 'stop' } }
     },
   } as never)
-  ctx.provide('attachments', {} as never)
+  ctx.provide('attachments', {
+    readImage: async (ref: ImageAttachmentRef) => ({
+      ref,
+      data: new Uint8Array([1, 2, 3]),
+    }),
+  } as never)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  apply(ctx, Config({}))
+  apply(ctx, Config(config))
   return { ctx, requests }
 }
 
@@ -171,22 +197,21 @@ describe('mcp-image-generation', () => {
     expect(result.content).toEqual([{ type: 'text', text: 'Error: count must be a positive safe integer' }])
   })
 
-  it('uses the latest user image with the configured Qwen vision endpoint', async () => {
-    const ctx = new Context()
-    contexts.push(ctx)
+  it('routes the latest user image through the custom OpenAI-compatible provider', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: 'A small blue square.' } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { ctx } = await harness(true, {
+      visionProvider: 'vision-gateway',
+      visionBaseURL: 'https://vision.example/v1',
+      visionModel: 'vision-1',
+      visionApiKeyEnv: 'VISION_GATEWAY_API_KEY',
+    })
     const image = {
       attachmentId: AttachmentId(`sha256:${'b'.repeat(64)}`),
       mediaType: 'image/png' as const, bytes: 3, width: 1, height: 1,
     }
-    const readImage = vi.fn().mockResolvedValue({ ref: image, data: new Uint8Array([1, 2, 3]) })
-    ctx.provide('attachments', { readImage } as never)
-    await ctx.plugin(SystemPrompt)
-    await ctx.plugin(ToolRuntime)
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
-      choices: [{ message: { content: 'A small blue square.' } }],
-    }), { status: 200, headers: { 'content-type': 'application/json' } }))
-    apply(ctx, Config({ visionApiKey: 'qwen-test-key' }))
-
     const result = await ctx.tools.execute({
       callId: 'vision-1' as never,
       name: ANALYZE_IMAGE_TOOL,
@@ -203,15 +228,89 @@ describe('mcp-image-generation', () => {
     })
 
     expect(result).toMatchObject({ isError: false, content: [{ type: 'text', text: 'A small blue square.' }] })
-    expect(readImage).toHaveBeenCalledWith(image, expect.any(AbortSignal))
     expect(fetchMock).toHaveBeenCalledOnce()
-    const request = fetchMock.mock.calls[0]?.[1]
-    expect(request?.headers).toMatchObject({ authorization: 'Bearer qwen-test-key' })
-    const body = typeof request?.body === 'string' ? request.body : ''
-    expect(JSON.parse(body)).toMatchObject({
-      model: 'qwen3.7-flash',
-      messages: [{ content: [{ type: 'text', text: 'Describe the image briefly.' }, { type: 'image_url' }] }],
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://vision.example/v1/chat/completions')
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(request.headers).not.toHaveProperty('authorization')
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      model: 'vision-1', max_tokens: 2_048,
+      messages: [{ role: 'user', content: [
+        { type: 'text', text: 'Describe the image briefly.' },
+        { type: 'image_url' },
+      ] }],
     })
-    fetchMock.mockRestore()
+  })
+
+  it.each([
+    ['minimax-h3', 'https://vision.example/v1/chat/completions'],
+    ['openai-responses', 'https://vision.example/v1/responses'],
+    ['anthropic-messages', 'https://vision.example/v1/messages'],
+  ] as const)('uses the %s visual protocol', async (api, endpoint) => {
+    const response = api === 'openai-responses'
+      ? { output_text: 'A response image.' }
+      : api === 'anthropic-messages'
+        ? { content: [{ type: 'text', text: 'An Anthropic image.' }] }
+        : { choices: [{ message: { content: 'A MiniMax image.' } }] }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { ctx } = await harness(true, {
+      visionProvider: 'vision-gateway',
+      visionBaseURL: 'https://vision.example/v1',
+      visionApi: api,
+      visionModel: 'vision-1',
+    })
+    const image = {
+      attachmentId: AttachmentId(`sha256:${'f'.repeat(64)}`),
+      mediaType: 'image/png' as const, bytes: 3, width: 1, height: 1,
+    }
+    const result = await ctx.tools.execute({
+      callId: `vision-${api}` as never,
+      name: ANALYZE_IMAGE_TOOL,
+      arguments: { prompt: 'Describe the image.' },
+      agent: { session: { deriveMessages: () => [{
+        role: 'user', source: { kind: 'user' }, content: [{ type: 'image', attachment: image }],
+      }] } } as never,
+      signal: AbortSignal.timeout(1_000),
+    })
+
+    expect(result).toMatchObject({ isError: false })
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(endpoint)
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit
+    const body = JSON.parse(String(request.body)) as Record<string, unknown>
+    expect(body.model).toBe('vision-1')
+    if (api === 'anthropic-messages') {
+      expect(request.headers).not.toHaveProperty('x-api-key')
+      expect(request.headers).not.toHaveProperty('anthropic-version')
+      expect(body.messages).toBeTruthy()
+    } else if (api === 'openai-responses') {
+      expect(body.input).toBeTruthy()
+    } else {
+      expect(body.messages).toBeTruthy()
+    }
+  })
+
+  it('requires a configured image-capable model for visual understanding', async () => {
+    const { ctx } = await harness()
+    const image = {
+      attachmentId: AttachmentId(`sha256:${'e'.repeat(64)}`),
+      mediaType: 'image/png' as const, bytes: 3, width: 1, height: 1,
+    }
+    const result = await ctx.tools.execute({
+      callId: 'vision-missing-route' as never,
+      name: ANALYZE_IMAGE_TOOL,
+      arguments: { prompt: 'Describe the image.' },
+      agent: { session: { deriveMessages: () => [{
+        role: 'user', source: { kind: 'user' }, content: [{ type: 'image', attachment: image }],
+      }] } } as never,
+      signal: AbortSignal.timeout(1_000),
+    })
+
+    expect(result).toMatchObject({ isError: true })
+    const first = result.content[0]
+    expect(first?.type).toBe('text')
+    if (first?.type === 'text') expect(first.text).toContain('complete the custom provider')
   })
 })

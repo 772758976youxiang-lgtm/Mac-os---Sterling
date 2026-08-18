@@ -35,6 +35,8 @@ export interface PluginCardProps {
   onSave: () => void
   /** Drop every staged edit. */
   onDiscard: () => void
+  /** Optional hook for a card that should load sensitive state on first open. */
+  onOpen?: () => void
   /** The plugin's controls. */
   children: ReactNode
 }
@@ -57,7 +59,11 @@ export function PluginCard(props: PluginCardProps) {
         className={css.header}
         aria-expanded={open}
         aria-label={`${props.t(open ? 'collapse' : 'expand')}: ${title}`}
-        onClick={() => { setOpen(!open) }}
+        onClick={() => {
+          const nextOpen = !open
+          setOpen(nextOpen)
+          if (nextOpen) props.onOpen?.()
+        }}
       >
         <span className={css.headText}>
           <span className={css.name}>{title}</span>

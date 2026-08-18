@@ -8,10 +8,9 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './McpManagementSettingsTab.module.css'
-import type { McpVisionSettingsFace, McpVisionSettingsState } from './mcp-vision-settings-controller.ts'
 
 /** Registration-side Remote face used by the MCP management tab. */
-export interface McpManagementSettingsTabInjected extends McpVisionSettingsFace {
+export interface McpManagementSettingsTabInjected {
   /** Read the configured MCP servers and their currently discovered tools. */
   list: () => Promise<McpInventorySnapshot>
 }
@@ -49,18 +48,12 @@ function matches(server: McpServer, query: string): boolean {
 export function McpManagementSettingsTab({
   list,
   t,
-  useMcpVisionSettings,
-  edit,
-  save,
-  discard,
 }: McpManagementSettingsTabProps): ReactNode {
   const catalogId = useId()
   const [request, setRequest] = useState(0)
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [state, setState] = useState<ViewState>({ status: 'loading' })
-  const vision = useMcpVisionSettings(snapshot => snapshot)
-
   useEffect(() => {
     let current = true
     void Promise.resolve().then(() => list()).then(
@@ -97,7 +90,6 @@ export function McpManagementSettingsTab({
           <button type="button" onClick={retry}>{t('retry')}</button>
         </div>
       ) : null}
-      <VisionSettingsBlock state={vision} t={t} onEdit={edit} onSave={save} onDiscard={discard} />
       {state.status === 'ready' ? (
         <div className={css.catalog}>
           <label className={css.search}>
@@ -166,71 +158,5 @@ export function McpManagementSettingsTab({
         </div>
       ) : null}
     </div>
-  )
-}
-
-/** Compact configuration block for the optional multimodal fallback. */
-function VisionSettingsBlock({
-  state,
-  t,
-  onEdit,
-  onSave,
-  onDiscard,
-}: {
-  state: McpVisionSettingsState
-  t: McpManagementSettingsTabProps['t']
-  onEdit: McpVisionSettingsFace['edit']
-  onSave: McpVisionSettingsFace['save']
-  onDiscard: McpVisionSettingsFace['discard']
-}): ReactNode {
-  if (!state.available) return <p className={css.status}>{t('visionUnavailable')}</p>
-  const disabled = !state.writable || !state.apiKeyWritable || state.saving
-  return (
-    <section className={css.vision} aria-labelledby="mcp-vision-title">
-      <div className={css.visionHeader}>
-        <div>
-          <h3 id="mcp-vision-title">{t('visionTitle')}</h3>
-          <p>{t('visionDescription')}</p>
-        </div>
-        <span className={state.apiKeyConfigured ? css.configured : css.unconfigured} role="status">
-          {state.apiKeyConfigured ? t('visionConfigured') : t('visionNotConfigured')}
-        </span>
-      </div>
-      <div className={css.visionFields}>
-        <label className={css.visionField}>
-          <span>{t('visionApiKeyRef')}</span>
-          <input
-            type="text"
-            value={state.apiKeyRef}
-            disabled={disabled}
-            onChange={(event) => { onEdit('apiKeyRef', event.currentTarget.value) }}
-          />
-        </label>
-        <label className={css.visionField}>
-          <span>{t('visionApiKey')}</span>
-          <input
-            type="password"
-            autoComplete="off"
-            value={state.apiKeyDraft}
-            placeholder={state.apiKeyConfigured ? t('visionKeyConfiguredPlaceholder') : ''}
-            disabled={disabled}
-            onChange={(event) => { onEdit('apiKey', event.currentTarget.value) }}
-          />
-        </label>
-      </div>
-      <div className={css.visionMeta}>
-        <span>{state.model}</span>
-        <span>{state.baseURL}</span>
-      </div>
-      <div className={css.visionFooter}>
-        {state.failed ? <span className={css.visionError} role="alert">{t('visionSaveFailed')}</span> : null}
-        <button type="button" className={css.visionSecondary} disabled={!state.dirty || state.saving} onClick={onDiscard}>
-          {t('discard')}
-        </button>
-        <button type="button" className={css.visionPrimary} disabled={!state.dirty || disabled} onClick={onSave}>
-          {state.saving ? t('saving') : t('save')}
-        </button>
-      </div>
-    </section>
   )
 }

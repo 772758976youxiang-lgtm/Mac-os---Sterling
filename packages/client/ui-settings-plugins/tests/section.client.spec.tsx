@@ -17,12 +17,15 @@ import { ConfigurablePluginsTab } from '../src/client/ConfigurablePluginsTab.tsx
 import type { ConfigurablePluginsTabProps } from '../src/client/ConfigurablePluginsTab.tsx'
 import { PluginsSettingsSection } from '../src/client/PluginsSettingsSection.tsx'
 import type { PluginsSettingsSectionProps, PluginsSettingsTabEntry } from '../src/client/PluginsSettingsSection.tsx'
+import { VisionCard } from '../src/client/VisionCard.tsx'
+import type { VisionCardProps } from '../src/client/VisionCard.tsx'
 import { WebSearchCard } from '../src/client/WebSearchCard.tsx'
 import type { WebSearchCardProps } from '../src/client/WebSearchCard.tsx'
 import type { AgentLoopCardState } from '../src/client/agent-loop-card-controller.ts'
 import type { BashCardState } from '../src/client/bash-card-controller.ts'
 import type { CardFieldState, CardShell } from '../src/client/card-form.ts'
 import type { WebSearchCardState } from '../src/client/web-search-card-controller.ts'
+import type { VisionSettingsState } from '../src/client/vision-card-controller.ts'
 import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -78,6 +81,25 @@ function renderBash(state: Partial<BashCardState> = {}) {
   const actions = cardActions()
   const props = { ...actions, t, useBashCard: bindSnapshotSelector(store) } as unknown as BashCardProps
   render(<BashCard {...props} />)
+  return actions
+}
+
+function renderVision(state: Partial<VisionSettingsState> = {}) {
+  const store = createSnapshotStore<VisionSettingsState>({
+    ...settled,
+    provider: 'vision',
+    displayName: 'Vision',
+    baseURL: 'https://vision.example/v1',
+    api: 'openai-completions',
+    model: 'vision-1',
+    apiKeyDraft: '',
+    apiKeyConfigured: false,
+    apiKeyWritable: true,
+    ...state,
+  })
+  const actions = cardActions()
+  const props = { ...actions, t, useVisionSettings: bindSnapshotSelector(store) } as unknown as VisionCardProps
+  render(<VisionCard {...props} />)
   return actions
 }
 
@@ -397,5 +419,35 @@ describe('WebSearchCard', () => {
       ['maxUses', '4'],
     ])
     expect(actions.resetField.mock.calls).toEqual([['baseURL'], ['maxUses']])
+  })
+})
+
+describe('VisionCard', () => {
+  it('renders a custom provider form and stages fields only when expanded', () => {
+    const actions = renderVision()
+
+    expect(screen.getByText(en.visionTitle)).toBeTruthy()
+    expect(screen.queryByLabelText(en.visionProvider)).toBeNull()
+
+    fireEvent.click(screen.getByText(en.visionTitle))
+    expect([...screen.getByLabelText(en.visionApi).querySelectorAll('option')].map(option => option.value)).toEqual([
+      'openai-completions', 'minimax-h3', 'openai-responses', 'anthropic-messages', 'openai-image-generations',
+    ])
+    fireEvent.change(screen.getByLabelText(en.visionProvider), { target: { value: 'acme-gateway' } })
+    fireEvent.change(screen.getByLabelText(en.visionBaseUrl), { target: { value: 'https://gateway.example/v1' } })
+    fireEvent.change(screen.getByLabelText(en.visionModel), { target: { value: 'acme-vision' } })
+
+    expect(actions.edit.mock.calls).toEqual([
+      ['provider', 'acme-gateway'],
+      ['baseURL', 'https://gateway.example/v1'],
+      ['model', 'acme-vision'],
+    ])
+    expect(screen.getByText(en.visionCustomHint)).toBeTruthy()
+  })
+
+  it('does not render while the visual-recognition namespace is unavailable', () => {
+    renderVision({ available: false })
+
+    expect(screen.queryByText(en.visionTitle)).toBeNull()
   })
 })

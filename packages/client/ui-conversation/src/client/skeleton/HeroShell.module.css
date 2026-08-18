@@ -1,4 +1,4 @@
-/* NEW SESSION hero (figma Input_Bottom 75:8208): fish + title, workspace chip
+/* NEW SESSION hero (figma Input_Bottom 75:8208): brand mark + title, workspace chip
    above the shared InputBar card. The input itself is InputBar — only stack
    geometry and the chip live here. */
 
@@ -23,7 +23,7 @@
   overflow: visible;
 }
 
-/* figma 34:10411: fish + title, gap 10, centered; 26/32 wt500. */
+/* figma 34:10411: brand mark + title, gap 10, centered; 26/32 wt500. */
 .headline {
   display: grid;
   grid-template-columns: 34px auto;
@@ -50,9 +50,9 @@
   justify-content: center;
 }
 
-/* Keep the hero mark in the same primary ink as its headline. */
+/* Keep the supplied brand mark sized inside the stationary hover target. */
 .fish {
-  color: var(--dsw-alias-label-primary);
+  display: block;
   transform-origin: 50% 60%;
 }
 

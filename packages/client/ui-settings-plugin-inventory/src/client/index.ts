@@ -1,17 +1,14 @@
 /** Read-only Host plugin inventory registered into Web Settings. */
 
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { McpManagementSettingsTab, type McpManagementSettingsTabInjected } from './McpManagementSettingsTab.tsx'
-import { McpVisionSettingsController, unavailableMcpVisionSettingsFace } from './mcp-vision-settings-controller.ts'
 import { PluginInventorySettingsTab, type PluginInventorySettingsTabInjected } from './PluginInventorySettingsTab.tsx'
 import { en, zh, type PluginInventoryLocaleKey } from './locales.ts'
 
 export type { PluginInventorySettingsTabInjected, PluginInventorySettingsTabProps } from './PluginInventorySettingsTab.tsx'
 export type { McpManagementSettingsTabInjected, McpManagementSettingsTabProps } from './McpManagementSettingsTab.tsx'
-export type { McpVisionSettings, McpVisionSettingsFace, McpVisionSettingsState } from './mcp-vision-settings-controller.ts'
 export type { PluginInventoryLocaleKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -25,17 +22,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const NS = 'settings.pluginInventory'
 
 /** Services required by the Settings registration and generated Remote face. */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.pluginInventory', 'settingsScope']
+export const inject = ['slots', 'locale', 'remote', 'remote.pluginInventory']
 
 /** Contribute the lazy inventory tab to the Plugins settings section. */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-plugin-inventory: dictionaries')
-
-  const connection = ctx.get('connection') as ConnectionHandle | undefined
-  const settingsScope = ctx.get('settingsScope')
-  const vision = connection === undefined || settingsScope === undefined
-    ? unavailableMcpVisionSettingsFace()
-    : new McpVisionSettingsController(settingsScope.bind({ namespace: 'mcp-image-generation' }), connection.api).inject()
 
   const t = ctx.locale.bind(NS)
   const list: PluginInventorySettingsTabInjected['list'] = async () => {
@@ -53,7 +44,7 @@ export function apply(ctx: ClientContext): void {
     }
     return result.value
   }
-  const mcpInjected = (): McpManagementSettingsTabInjected => ({ list: listMcp, ...vision })
+  const mcpInjected = (): McpManagementSettingsTabInjected => ({ list: listMcp })
 
   ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({
     name: 'settings.plugins.tab',

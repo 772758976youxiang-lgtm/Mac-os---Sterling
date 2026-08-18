@@ -7,7 +7,6 @@ import type {
   McpManagementSettingsTabProps,
 } from '../src/client/McpManagementSettingsTab.tsx'
 import { en, type PluginInventoryLocaleKey } from '../src/client/locales.ts'
-import type { McpVisionSettingsState } from '../src/client/mcp-vision-settings-controller.ts'
 
 afterEach(cleanup)
 
@@ -45,27 +44,7 @@ const SNAPSHOT = {
 } as unknown as Snapshot
 
 function props(list: McpManagementSettingsTabInjected['list']): McpManagementSettingsTabProps {
-  const vision: McpVisionSettingsState = {
-    available: true,
-    writable: true,
-    saving: false,
-    failed: false,
-    dirty: false,
-    apiKeyRef: 'DASHSCOPE_API_KEY',
-    apiKeyDraft: '',
-    apiKeyConfigured: false,
-    apiKeyWritable: true,
-    model: 'qwen3.7-flash',
-    baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-  }
-  return {
-    t,
-    list,
-    useMcpVisionSettings: (selector: (state: McpVisionSettingsState) => unknown) => selector(vision),
-    edit: () => {},
-    save: () => {},
-    discard: () => {},
-  } as McpManagementSettingsTabProps
+  return { t, list } as McpManagementSettingsTabProps
 }
 
 describe('McpManagementSettingsTab', () => {
@@ -73,6 +52,7 @@ describe('McpManagementSettingsTab', () => {
     render(<McpManagementSettingsTab {...props(async () => SNAPSHOT)} />)
 
     expect(await screen.findByRole('heading', { name: en.mcpCatalog })).toBeTruthy()
+    expect(screen.queryByText('视觉识别')).toBeNull()
     expect(screen.getByRole('searchbox', { name: en.mcpSearch })).toBeTruthy()
     const github = screen.getByRole('button', { name: 'github, Connected, 2 capabilities' })
     expect(screen.getByRole('img', { name: en.mcpConnected })).toBeTruthy()

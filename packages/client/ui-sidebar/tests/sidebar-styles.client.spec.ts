@@ -67,4 +67,15 @@ describe('SidebarRoot.module.css', () => {
     expect(declarations('.collapsed .newSession')?.get('align-self')).toBe('flex-start')
     expect(declarations('.collapsed .newSession')?.get('width')).toBe('36px')
   })
+
+  it('centers the collapsed brand and expand affordance in one stable control', () => {
+    expect(declarations('.collapsed .toggle')?.get('position')).toBe('relative')
+    for (const selector of ['.collapsed .toggle .railFish', '.collapsed .toggle .panelIcon']) {
+      expect(declarations(selector)?.get('position')).toBe('absolute')
+      expect(declarations(selector)?.get('inset')).toBe('0')
+      expect(declarations(selector)?.get('margin')).toBe('auto')
+    }
+    expect(declarations('.collapsed .toggle:hover .panelIcon')?.get('display')).toBe('block')
+    expect(declarations('.collapsed .toggle:hover .railFish')?.get('opacity')).toBe('0')
+  })
 })
