@@ -119,7 +119,7 @@ describe('web e2e: assistant IconActions wait for the turn to end', () => {
     await expect.poll(() => existsSync(marker), { timeout: 20_000 }).toBe(true)
     await expect.poll(() => page.getByText(NARRATION, { exact: true }).count(), { timeout: 10_000 }).toBe(1)
     await expect.poll(
-      () => page.getByRole('status').filter({ hasText: 'Deep diving...' }).isVisible(),
+      () => page.getByRole('status').filter({ hasText: /埋头苦干中|脑袋冒烟中|小宇宙爆发|挖呀挖呀挖/ }).isVisible(),
       { timeout: 10_000 },
     ).toBe(true)
     // Only the user bubble owns a footer (clock + copy; user bubbles carry no

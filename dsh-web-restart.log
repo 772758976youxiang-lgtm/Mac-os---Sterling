@@ -1,0 +1,12 @@
+16:38:38 restart script started; brief delay so the running session can flush
+16:38:48 killing old dsh web pid 26040
+16:38:48 started new dsh web pid 31484
+16:38:56 RESTART_DONE ok=True newPid=31484
+16:50:50 restart script started; brief delay so the running session can flush
+16:50:59 killing old dsh web pid 31484
+16:51:00 started new dsh web pid 37664
+16:51:13 RESTART_DONE ok=True newPid=37664
+17:30:31 restart script started; brief delay so the running session can flush
+17:30:40 killing old dsh web pid 19444
+17:30:41 started new dsh web pid 13612
+17:30:55 RESTART_DONE ok=True newPid=13612

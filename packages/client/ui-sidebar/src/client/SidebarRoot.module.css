@@ -166,8 +166,12 @@
   display: inline;
 }
 
+/* SterlingMark paints `display: block` inline, which would otherwise outrank
+   this hide rule and leave the whale and the panel icon side by side in the
+   36px rail control. !important is the only thing that beats the inline
+   style. */
 .collapsed .toggle:hover .railFish {
-  display: none;
+  display: none !important;
 }
 
 /* Rail icons ride the primary ink (figma rail spec); expanded keeps the

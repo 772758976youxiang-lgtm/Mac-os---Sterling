@@ -103,6 +103,11 @@ function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | 
   return latest
 }
 
+/** Cute, relaxed status phrases rotated while a turn is actively running. */
+const TURN_STATUS_PHRASES = ['埋头苦干中', '脑袋冒烟中', '小宇宙爆发', '挖呀挖呀挖'] as const
+/** One carousel slot per phrase; every slot the elapsed clock ticks 3 times. */
+const TURN_STATUS_PHRASE_MS = 3_000
+
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
 function TurnStatus({ startTime, t }: {
   /** The running turn's logged `turn/start` time; null falls back to mount
@@ -124,12 +129,20 @@ function TurnStatus({ startTime, t }: {
     const id = setInterval(tick, 1000)
     return () => { clearInterval(id) }
   }, [anchor])
+  // Carousel index is a pure function of the elapsed clock: no extra timer,
+  // and mid-turn reloads keep the phrase in step with the real elapsed time.
+  // The key remounts the span so its pop-in animation replays per phrase.
+  const phrase = TURN_STATUS_PHRASES[
+    Math.floor(elapsedMs / TURN_STATUS_PHRASE_MS) % TURN_STATUS_PHRASES.length
+  ] ?? TURN_STATUS_PHRASES[0]
   // Short turns keep the plain label; the clock only appears once the turn
   // has clearly been running for a while.
   const showClock = elapsedMs >= 15_000
   return (
     <div className={css.turnStatus} role="status" aria-live="polite">
-      Deep diving...
+      <span key={phrase} className={css.turnStatusPhrase}>
+        {phrase}
+      </span>
       {showClock && (
         <span className={css.turnStatusClock} aria-hidden>
           {formatRunDuration(elapsedMs, t)}

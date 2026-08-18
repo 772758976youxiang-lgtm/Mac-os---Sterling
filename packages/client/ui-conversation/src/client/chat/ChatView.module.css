@@ -100,6 +100,24 @@
   -webkit-text-fill-color: var(--dsw-alias-label-caption);
 }
 
+/* Carousel phrase: a soft rise-and-settle pop that replays on each swap
+   (the phrase span is keyed, so React remounts it every rotation). */
+.turnStatusPhrase {
+  display: inline-block;
+  animation: dsh-turn-status-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes dsh-turn-status-pop {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes dsh-turn-status-shimmer {
   to {
     background-position: 0 0;
@@ -110,6 +128,9 @@
   .turnStatus {
     background-position: 0 0;
     background-size: 100% 100%;
+    animation: none;
+  }
+  .turnStatusPhrase {
     animation: none;
   }
 }

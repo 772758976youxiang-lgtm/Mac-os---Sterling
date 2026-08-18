@@ -814,6 +814,9 @@ function normalizeAria(snapshot: string, workspaceCwd: string): string {
     .replace(/\d{1,2}月\d{1,2}日 \d{2}:\d{2}/g, '{{clock}}')
     .replace(/(?<!\d)\d{1,2}:\d{2}:\d{2}(?:\.\d+)?(?:\s*[AP]M)?(?!\d)/gi, '{{clock}}')
     .replace(/(?<!\d)\d{2}:\d{2}(?!\d)/g, '{{clock}}')
+    // The running-turn status rotates through a carousel of playful phrases;
+    // collapse every slot so goldens stay stable mid-rotation.
+    .replace(/埋头苦干中|脑袋冒烟中|小宇宙爆发|挖呀挖呀挖/g, '{{carousel}}')
 }
 
 /**
