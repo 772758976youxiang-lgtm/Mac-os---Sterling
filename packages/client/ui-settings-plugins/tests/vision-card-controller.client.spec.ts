@@ -74,6 +74,21 @@ describe('vision plugin custom provider controller', () => {
     await vi.waitFor(() => { expect(settings.set).toHaveBeenCalledWith('visionBaseURL', 'https://www.sdasd') })
   })
 
+  it('accepts a dotted provider ID used by Qwen', async () => {
+    const settings = scope()
+    const controller = new VisionSettingsController(settings as never, { credentials: credentials() } as never)
+    const face = controller.inject()
+
+    face.edit('provider', 'qwen3.7-flash')
+    face.edit('baseURL', 'https://dashscope.aliyuncs.com/compatible-mode/v1')
+    face.edit('model', 'qwen3.7-flash')
+
+    expect(face.hooks.visionSettings.getSnapshot()).toMatchObject({ dirty: true, invalid: false })
+
+    face.save()
+    await vi.waitFor(() => { expect(settings.set).toHaveBeenCalledWith('visionProvider', 'qwen3.7-flash') })
+  })
+
   it('blocks incomplete custom provider data', () => {
     const controller = new VisionSettingsController(scope() as never, { credentials: credentials() } as never)
     const face = controller.inject()

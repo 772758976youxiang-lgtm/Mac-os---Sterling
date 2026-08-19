@@ -16,8 +16,6 @@ export const VISION_API_PROTOCOLS = [
 ] as const
 const DEFAULT_API = VISION_API_PROTOCOLS[0]
 const DEFAULT_API_KEY_REF = 'STERLING_VISION_API_KEY'
-const ROUTE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
-
 /** Settings fields owned by the local image-understanding plugin. */
 export interface VisionSettings {
   visionProvider?: string
@@ -129,7 +127,7 @@ export class VisionSettingsController {
   }
 
   private valid(): boolean {
-    return ROUTE_PATTERN.test(this.provider())
+    return this.provider().trim() !== ''
       && this.value('visionBaseURL').trim() !== ''
       && validBaseURL(this.value('visionBaseURL'))
       && this.value('visionModel').trim() !== ''
