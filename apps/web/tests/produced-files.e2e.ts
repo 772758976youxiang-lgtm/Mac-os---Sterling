@@ -1,12 +1,9 @@
-// Web e2e scenario: the single-line produced-files summary a finished turn
-// ends with. Cold-seeds ten writes (zero model calls), then verifies the real
-// assembled lane keeps a precise +N and a capability-gated folder handoff.
-// The folder request is intercepted so one real browser click can exercise
-// the full client carrier without launching a native application in CI.
-import { fileURLToPath } from 'node:url'
+// Web e2e scenario: the produced-files list a finished turn ends with.
+// Cold-seeds ten writes (zero model calls), then verifies the real assembled
+// list stacks every produced file with no folding and no +N remainder.
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
-import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { CallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-title'
@@ -16,11 +13,10 @@ import {
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
 const MODE = webSnapshotMode()
-const OVERLAY = fileURLToPath(new URL('./produced-files.overlay.yml', import.meta.url))
 const SEED_ID = 'produced-files-web-e2e'
 const DONE = 'PRODUCED_FILES_DONE'
 
-/** Short leading names plus a long third name make the narrow lane deterministically show two. */
+/** Ten writes: every path must appear, none folded behind a remainder count. */
 const PRODUCED = [
   '关于我.md',
   'index.html',
@@ -110,7 +106,7 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
   let tripwire: ReturnType<typeof watchConsole>
 
   beforeAll(async () => {
-    scaffold = await launchWebScaffold({ extraOverlayPath: OVERLAY })
+    scaffold = await launchWebScaffold({})
     await seedSession(scaffold, producedFixture(), SEED_ID)
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
@@ -127,7 +123,7 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
     await scaffold?.close()
   })
 
-  it.skipIf(MODE === 'record')('keeps a narrow ten-file summary on one line with +8 and a folder action', async () => {
+  it.skipIf(MODE === 'record')('stacks every produced file with no folding and no remainder count', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-produced-files'))
     const groupRow = page.locator('[role="treeitem"]').first()
     await groupRow.waitFor({ timeout: 15_000 })
@@ -141,38 +137,17 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
     const row = page.locator('[data-produced-files-row]')
     await row.waitFor({ timeout: 15_000 })
     const chips = row.getByRole('button')
-    await expect.poll(() => chips.count()).toBe(2)
+    await expect.poll(() => chips.count()).toBe(PRODUCED.length)
     expect(await chips.nth(0).innerText()).toBe('关于我.md')
-    expect(await chips.nth(1).innerText()).toBe('index.html')
-    expect(await row.getByText('+ 8 files', { exact: true }).count()).toBe(1)
-    const showFolder = page.getByRole('button', { name: 'Show in folder', exact: true })
-    expect(await showFolder.count()).toBe(1)
+    expect(await chips.nth(PRODUCED.length - 1).innerText()).toBe('manifest.yaml')
+    expect(await row.getByText(/^\+ \d+ files$/).count()).toBe(0)
+    expect(await page.getByRole('button', { name: 'Show in folder', exact: true }).count()).toBe(0)
     expect(await page.getByText('Produced', { exact: true }).count()).toBe(1)
 
-    const openPath = vi.spyOn(scaffold.ctx.apiProxy.host, 'openPath')
-      .mockImplementation(async (request, _signal) => ({
-        rpcId: request.rpcId,
-        result: { ok: true, value: { opened: true as const } },
-      }))
-    try {
-      const [response] = await Promise.all([
-        page.waitForResponse(response => new URL(response.url()).pathname === '/api/host.openPath'),
-        showFolder.click({ clickCount: 1 }),
-      ])
-      expect(response.status()).toBe(200)
-      expect(openPath).toHaveBeenCalledTimes(1)
-      expect(openPath.mock.calls[0]![0].payload).toEqual({ path: `${scaffold.workspaceCwd}/.` })
-    } finally {
-      openPath.mockRestore()
-    }
-
+    // Vertical stacking: every chip starts lower than the one before it.
     const tops = await row.locator(':scope > *').evaluateAll(elements =>
-      elements.map(element => element.getBoundingClientRect().top))
-    expect(new Set(tops.map(top => Math.round(top))).size).toBe(1)
-    const geometry = await row.evaluate(element => ({
-      clientWidth: element.clientWidth, scrollWidth: element.scrollWidth,
-    }))
-    expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth)
+      elements.map(element => Math.round(element.getBoundingClientRect().top)))
+    expect(new Set(tops).size).toBe(tops.length)
 
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
