@@ -1,0 +1,34 @@
+# 依赖与构建产物
+node_modules/
+pnpm-lock.yaml
+
+# 系统与编辑器
+.DS_Store
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+
+# 密钥与敏感文件（永远不得入库）
+*.pem
+*.key
+.env
+.env.*
+credentials.yaml
+
+# 打包产物
+*.tgz
+*.tar.gz
+
+# IDE
+.idea/
+.vscode/
+
+# 构建产物（由 build 生成，不入 git）
+plugin/lib/
+
+# 本地工具目录（工作树存在、未跟踪，防误 add）
+.dsh-vision-toolkit/
