@@ -1,4 +1,4 @@
-/ Bottom Info Bar（底部信息栏插件）— client half（静态 bundle 形态）
+// Bottom Info Bar（底部信息栏插件）— client half（静态 bundle 形态）
 // - host.call(method, args) → fetch POST /_dsh/dsh-bottom-info-bar/<method>（JSON）
 // - ctx.interval / ctx.timeout → window.setInterval / window.setTimeout
 // - styles.insert(css) → document 注入 <style>（installStyles）
