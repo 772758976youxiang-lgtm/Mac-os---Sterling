@@ -5,6 +5,7 @@ import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attach
 import type { ChatNodeOwnerProps, ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatNode } from '../contract/chat-nodes.ts'
 import { messageImageLabels } from '../image-labels.ts'
+import { assistantBlocksVisible } from './AssistantMarkdown.tsx'
 import css from './ChatView.module.css'
 
 interface ChatNodeSeatProps extends ChatNodeOwnerProps {
@@ -73,6 +74,18 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
     }, [node, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions, showThinking])
   if (routedNode === undefined || owner === null) return null
   if (routedNode.kind === 'context' && !showContextInjections) return null
+  if (routedNode.kind === 'assistant-step') {
+    // The slot outlet always renders an anchor wrapper around the keyed
+    // renderer, so a declined row is never an empty flex item and the
+    // `.flowItem:empty` collapse never fires. A step whose blocks were all
+    // filtered (hidden reasoning, tool heads) must not take the row at all,
+    // or the flow column's 16px gap doubles above the next tool row.
+    const data = routedNode.data
+    const visibleBlocks = showThinking ? data.blocks : data.blocks.filter(block => block.kind !== 'reasoning')
+    if (!assistantBlocksVisible(visibleBlocks, data.status === 'running', data.status === 'interrupted')) {
+      return null
+    }
+  }
   if (routedNode.kind === 'tool-call' && !showToolCalls) {
     // Hiding tool-call chrome must not hide the output the tool produced: a
     // generation result's images are the user-facing answer, so they stay in

@@ -35,6 +35,26 @@ export interface AssistantMarkdownProps {
   t: ChatViewSlotProps['t']
 }
 
+/**
+ * Whether an Assistant step has anything to paint after the show-thinking
+ * filter. Shared by AssistantMarkdown (which drops the root shell) and
+ * ChatNodeSeat (which must not render the flow row at all, since the slot
+ * outlet keeps the row non-empty and the `.flowItem:empty` collapse never
+ * fires under the real renderer).
+ * @param blocks - blocks already filtered by the show-thinking preference.
+ * @param streaming - whether the step is still running.
+ * @param interrupted - whether the step was cut short.
+ * @returns true when the step should render its shell or marker.
+ */
+export function assistantBlocksVisible(
+  blocks: readonly AssistantBlock[],
+  streaming: boolean,
+  interrupted: boolean,
+): boolean {
+  return interrupted
+    || blocks.some(block => block.kind !== 'tool-call' && (block.kind !== 'image-pending' || streaming))
+}
+
 /** Reasoning block as the Think variant summary row (figma 39:28304). */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
   blocks, streaming, interrupted, loadImage, mentions, showThinking = true, t,
@@ -50,9 +70,11 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   // Tool-call heads render as tool rows in the chat view's grouping pass, so
   // a node that is only those heads (or empty) would paint an empty root
   // between tool groups — skip the shell unless something visible remains.
-  const hasVisible = streaming
-    || interrupted === true
-    || visibleBlocks.some(block => block.kind !== 'tool-call' && block.kind !== 'image-pending')
+  // Streaming alone is not a reason to paint: a running step whose every
+  // block was filtered out (hidden reasoning, tool heads) would otherwise
+  // leave a zero-height shell that still consumes the flow column's 16px
+  // gap, doubling the space above the following tool row.
+  const hasVisible = assistantBlocksVisible(visibleBlocks, streaming, interrupted === true)
   if (!hasVisible) return null
   const rendered: ReactNode[] = []
   for (let i = 0; i < visibleBlocks.length; i++) {
@@ -91,8 +113,8 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         // the gallery under a shifted key.
         const start = i
         const group = [block]
-        while (i + 1 < blocks.length) {
-          const next = blocks[i + 1]
+        while (i + 1 < visibleBlocks.length) {
+          const next = visibleBlocks[i + 1]
           if (next === undefined || next.kind !== 'image') break
           group.push(next)
           i += 1

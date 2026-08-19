@@ -187,80 +187,88 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     fallback?: React.ReactNode
     hookContext?: unknown
   }) => {
-    if (key !== 'conversation.chat.node') return opts?.fallback ?? null
-    const nodeOwner = owner as RoutedChatNodeOwner
-    const nodeKey = opts?.hookContext as string | undefined
-    const useTurnData: UseChatNodeTurnData = dataKey => props.useSession((snapshot) => {
-      const location = nodeKey === undefined ? undefined : snapshot.chat.nodes.get(nodeKey)?.location
-      return location?.kind === 'turn' || location?.kind === 'step'
-        ? location.turn.data.get(dataKey)
-        : undefined
-    })
-    const nodeProps = <Kind extends ChatNode['kind']>(): ChatNodeViewProps<Kind> => (
-      { ...props, ...nodeOwner, useTurnData } as unknown as ChatNodeViewProps<Kind>
-    )
-    switch (nodeOwner.node.kind) {
-      case 'user':
-      case 'steering':
-        return <UserMessageNodeView {...nodeProps<'user' | 'steering'>()} />
-      case 'context':
-        return <ContextMessageNodeView {...nodeProps<'context'>()} />
-      case 'assistant-step':
-        return <AssistantNodeView {...nodeProps<'assistant-step'>()} />
-      case 'command':
-        return (
-          <CommandNodeView
-            {...nodeProps<'command'>()}
-            renderSlot={renderCommandSlot}
-            SessionProvider={props.SessionProvider}
-          />
-        )
-      case 'manual-compaction':
-        return <ManualCompactionNodeView {...nodeProps<'manual-compaction'>()} />
-      case 'compaction':
-        return <CompactionNodeView {...nodeProps<'compaction'>()} />
-      case 'model-retry':
-        return <RetryNodeView {...nodeProps<'model-retry'>()} />
-      case 'turn-error':
-        return <TurnErrorNodeView {...nodeProps<'turn-error'>()} />
-      case 'turn-max-tokens':
-        return <TurnMaxTokensNodeView {...nodeProps<'turn-max-tokens'>()} />
-      case 'turn-tail':
-        return (
-          <TurnTailNodeView
-            {...nodeProps<'turn-tail'>()}
-            renderSlot={renderTurnTailSlot}
-            renderSlotChain={renderTurnTail}
-            SessionProvider={props.SessionProvider}
-          />
-        )
-      case 'unknown':
-        return <UnknownNodeView {...nodeProps<'unknown'>()} />
-      case 'tool-call': {
-        const block = nodeOwner.node.data.root
-        const toolName = 'kind' in block ? block.call?.name ?? '' : block.name
-        const tool = {
-          callId: block.callId,
-          toolName,
-          block,
-          selectedCallId: nodeOwner.selectedCallId,
-          openFile: nodeOwner.openFile,
-          inspectCall: nodeOwner.inspectCall,
+    // The real renderer wraps every outlet in a `display: contents` anchor
+    // (SlotOutlet), so a declined row still leaves the flow item non-empty
+    // and `.flowItem:empty` never collapses it. Reproduce that wrapper here
+    // so specs exercise the seat's own empty-row handling, not a bare
+    // renderer that real slot dispatch never produces.
+    const body = (() => {
+      if (key !== 'conversation.chat.node') return opts?.fallback ?? null
+      const nodeOwner = owner as RoutedChatNodeOwner
+      const nodeKey = opts?.hookContext as string | undefined
+      const useTurnData: UseChatNodeTurnData = dataKey => props.useSession((snapshot) => {
+        const location = nodeKey === undefined ? undefined : snapshot.chat.nodes.get(nodeKey)?.location
+        return location?.kind === 'turn' || location?.kind === 'step'
+          ? location.turn.data.get(dataKey)
+          : undefined
+      })
+      const nodeProps = <Kind extends ChatNode['kind']>(): ChatNodeViewProps<Kind> => (
+        { ...props, ...nodeOwner, useTurnData } as unknown as ChatNodeViewProps<Kind>
+      )
+      switch (nodeOwner.node.kind) {
+        case 'user':
+        case 'steering':
+          return <UserMessageNodeView {...nodeProps<'user' | 'steering'>()} />
+        case 'context':
+          return <ContextMessageNodeView {...nodeProps<'context'>()} />
+        case 'assistant-step':
+          return <AssistantNodeView {...nodeProps<'assistant-step'>()} />
+        case 'command':
+          return (
+            <CommandNodeView
+              {...nodeProps<'command'>()}
+              renderSlot={renderCommandSlot}
+              SessionProvider={props.SessionProvider}
+            />
+          )
+        case 'manual-compaction':
+          return <ManualCompactionNodeView {...nodeProps<'manual-compaction'>()} />
+        case 'compaction':
+          return <CompactionNodeView {...nodeProps<'compaction'>()} />
+        case 'model-retry':
+          return <RetryNodeView {...nodeProps<'model-retry'>()} />
+        case 'turn-error':
+          return <TurnErrorNodeView {...nodeProps<'turn-error'>()} />
+        case 'turn-max-tokens':
+          return <TurnMaxTokensNodeView {...nodeProps<'turn-max-tokens'>()} />
+        case 'turn-tail':
+          return (
+            <TurnTailNodeView
+              {...nodeProps<'turn-tail'>()}
+              renderSlot={renderTurnTailSlot}
+              renderSlotChain={renderTurnTail}
+              SessionProvider={props.SessionProvider}
+            />
+          )
+        case 'unknown':
+          return <UnknownNodeView {...nodeProps<'unknown'>()} />
+        case 'tool-call': {
+          const block = nodeOwner.node.data.root
+          const toolName = 'kind' in block ? block.call?.name ?? '' : block.name
+          const tool = {
+            callId: block.callId,
+            toolName,
+            block,
+            selectedCallId: nodeOwner.selectedCallId,
+            openFile: nodeOwner.openFile,
+            inspectCall: nodeOwner.inspectCall,
+          }
+          toolOwners.push(tool)
+          return (
+            <div
+              data-testid={`tool-seat-${tool.callId}`}
+              data-chat-anchor-key={`call:${tool.callId}`}
+              data-chat-call-id={tool.callId}
+            >
+              {tool.toolName || '(unnamed)'}:{tool.callId}
+            </div>
+          )
         }
-        toolOwners.push(tool)
-        return (
-          <div
-            data-testid={`tool-seat-${tool.callId}`}
-            data-chat-anchor-key={`call:${tool.callId}`}
-            data-chat-call-id={tool.callId}
-          >
-            {tool.toolName || '(unnamed)'}:{tool.callId}
-          </div>
-        )
+        default:
+          return opts?.fallback ?? null
       }
-      default:
-        return opts?.fallback ?? null
-    }
+    })()
+    return <div data-slot={key} style={{ display: 'contents' }}>{body}</div>
   }) as unknown as ChatViewSlotProps['renderSlot']
   // SessionProvider seat arrives with the session-scope child declaration;
   // ChatView never invokes it (render-prop pass-through stub).
@@ -970,6 +978,27 @@ describe('ChatView', () => {
 
     act(() => { h.showThinking.set(true) })
     expect(view.getByText('careful thought')).toBeTruthy()
+  })
+
+  it('does not reserve a flow row for an assistant step that collapses to nothing', () => {
+    // A step whose only block is reasoning must not leave an empty flow item
+    // behind when thinking is hidden: the real slot outlet wraps the keyed
+    // renderer in a non-empty anchor, so `.flowItem:empty` never fires and
+    // the row would keep consuming the column gap above the next tool row.
+    const h = makeHarness({
+      nodes: [user(1, 'q'), {
+        kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1,
+        blocks: [{ kind: 'reasoning', text: 'quiet thought' }],
+      }],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('思考')).toBeTruthy()
+    expect(view.container.querySelector('[data-chat-flow-kind="assistant-step"]')).not.toBeNull()
+
+    act(() => { h.showThinking.set(false) })
+    expect(view.queryByText('思考')).toBeNull()
+    // The collapsed step takes no row at all: no empty flex item, no phantom gap.
+    expect(view.container.querySelector('[data-chat-flow-kind="assistant-step"]')).toBeNull()
   })
 
   it('keeps the Tool renderer mounted when a running call settles into log order', () => {

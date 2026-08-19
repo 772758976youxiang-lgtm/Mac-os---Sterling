@@ -80,6 +80,41 @@ describe('tails', () => {
       />,
     )
     expect(only.container.firstChild).toBeNull()
+
+    // The same collapse must hold while the step is still streaming: a
+    // zero-height shell would otherwise keep consuming the flow column's gap
+    // above the tool row that follows the hidden reasoning.
+    const running = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[{ kind: 'reasoning', text: 'quiet thoughts' }]}
+        streaming
+        showThinking={false}
+      />,
+    )
+    expect(running.container.firstChild).toBeNull()
+
+    // Streaming tool heads are drawn by the tool-call node, not this shell.
+    const toolHeads = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[{ kind: 'tool-call', callId: 'c', name: 'bash', argsRaw: '{}' }]}
+        streaming
+        showThinking={false}
+      />,
+    )
+    expect(toolHeads.container.firstChild).toBeNull()
+
+    // A streaming text answer still paints its shell and pulse.
+    const answer = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[{ kind: 'text', text: 'partial words' }]}
+        streaming
+        showThinking={false}
+      />,
+    )
+    expect(answer.getByText('partial words')).toBeTruthy()
   })
 
   it('renders the image-generation placeholder only while the request is running', () => {

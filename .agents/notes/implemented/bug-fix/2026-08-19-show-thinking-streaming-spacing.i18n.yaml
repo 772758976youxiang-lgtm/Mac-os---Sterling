@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-19-show-thinking-streaming-spacing.md
+2026-08-19-show-thinking-streaming-spacing.md: 2bb531a3dcb2f0fbce91098fca386053c2cc31f0
+2026-08-19-show-thinking-streaming-spacing.zh.md: a328e1e485043585d72375e4a772bb65963d7022
