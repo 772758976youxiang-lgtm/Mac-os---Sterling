@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
   CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR, DEFAULT_SHOW_CONTEXT_INJECTIONS,
-  DEFAULT_SHOW_TOOL_CALLS, apply,
+  DEFAULT_SHOW_THINKING, DEFAULT_SHOW_TOOL_CALLS, apply,
 } from '@deepseek-ai/dsh-client-ui-conversation'
 
 class MemorySettings extends SettingsProvider {
@@ -25,14 +25,15 @@ describe('ui-conversation host', () => {
       busyEnter: DEFAULT_BUSY_ENTER_BEHAVIOR,
       showContextInjections: DEFAULT_SHOW_CONTEXT_INJECTIONS,
       showToolCalls: DEFAULT_SHOW_TOOL_CALLS,
+      showThinking: DEFAULT_SHOW_THINKING,
     })
     await ctx.settings.update(ns, { busyEnter: 'steer' })
     expect(ctx.settings.get(ns)).toEqual({
-      busyEnter: 'steer', showContextInjections: true, showToolCalls: true,
+      busyEnter: 'steer', showContextInjections: true, showToolCalls: true, showThinking: true,
     })
     await ctx.settings.update(ns, { showContextInjections: false })
     expect(ctx.settings.get(ns)).toEqual({
-      busyEnter: 'steer', showContextInjections: false, showToolCalls: true,
+      busyEnter: 'steer', showContextInjections: false, showToolCalls: true, showThinking: true,
     })
     await expect(ctx.settings.update(ns, { busyEnter: 'invalid' })).rejects.toThrow()
     await fiber.dispose()

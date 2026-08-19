@@ -364,6 +364,8 @@ export interface ChatNodeOwnerProps {
   /** Resolve a session-authorized historical image for inline display. */
   loadImage: (attachment: ImageAttachmentRef) => Promise<string>
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
+  /** Whether assistant reasoning rows are rendered in the transcript. */
+  showThinking: boolean
 }
 
 /** Full props of one registered keyed Chat business renderer. */
@@ -678,6 +680,8 @@ export interface ChatViewInjected {
     showContextInjections: SnapshotStore<boolean>
     /** Whether tool-call records (MCP and friends) are rendered in the transcript. */
     showToolCalls: SnapshotStore<boolean>
+    /** Whether assistant reasoning rows are rendered in the transcript. */
+    showThinking: SnapshotStore<boolean>
   }
   /** Selection write + details panel opening in one gesture (store action + layout orchestration). */
   openDetails: (target: SelectionTarget) => void

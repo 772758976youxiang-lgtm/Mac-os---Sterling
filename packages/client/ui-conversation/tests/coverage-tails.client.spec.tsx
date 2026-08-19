@@ -57,6 +57,31 @@ describe('tails', () => {
     expect(blank.container.firstChild).toBeNull()
   })
 
+  it('drops reasoning blocks while the show-thinking preference is off', () => {
+    const hidden = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[{ kind: 'reasoning', text: 'quiet thoughts' }, { kind: 'text', text: 'answer' }]}
+        streaming={false}
+        showThinking={false}
+      />,
+    )
+    expect(hidden.queryByText('思考')).toBeNull()
+    expect(hidden.queryByText('quiet thoughts')).toBeNull()
+    expect(hidden.getByText('answer')).toBeTruthy()
+
+    // A node that is only hidden reasoning collapses entirely.
+    const only = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[{ kind: 'reasoning', text: 'quiet thoughts' }]}
+        streaming={false}
+        showThinking={false}
+      />,
+    )
+    expect(only.container.firstChild).toBeNull()
+  })
+
   it('renders the image-generation placeholder only while the request is running', () => {
     const active = render(
       <AssistantMarkdown t={t} blocks={[{ kind: 'image-pending' }]} streaming />,

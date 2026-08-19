@@ -31,6 +31,8 @@ import { ContextInjectionVisibilityRow } from './settings/ContextInjectionVisibi
 import type { ContextInjectionVisibilityRowInjected } from './settings/ContextInjectionVisibilityRow.tsx'
 import { ToolCallVisibilityRow } from './settings/ToolCallVisibilityRow.tsx'
 import type { ToolCallVisibilityRowInjected } from './settings/ToolCallVisibilityRow.tsx'
+import { ThinkingVisibilityRow } from './settings/ThinkingVisibilityRow.tsx'
+import type { ThinkingVisibilityRowInjected } from './settings/ThinkingVisibilityRow.tsx'
 import { ConversationDisplaySettings } from './settings/conversation-display-settings.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { StatsLine } from './chat/StatsLine.tsx'
@@ -172,6 +174,17 @@ export function apply(ctx: Context): void {
       setShowToolCalls: (visible) => { displaySettings.setShowToolCalls(visible) },
     }),
   }, ToolCallVisibilityRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'thinking-visibility',
+    order: 50,
+    locale: NS,
+    inject: (): ThinkingVisibilityRowInjected => ({
+      hooks: { showThinking: displaySettings.showThinking },
+      setShowThinking: (visible) => { displaySettings.setShowThinking(visible) },
+    }),
+  }, ThinkingVisibilityRow))
 
   // Chat semantic reader positions by session, surviving view switches and
   // width reflow when the tab ring remounts the view. Deliberately not
@@ -422,7 +435,11 @@ export function apply(ctx: Context): void {
       const conversation = concreteConversation(ctx)
       const scoped = scopedConversation(sessions, sessionId)
       return {
-        hooks: { showContextInjections: displaySettings.showContextInjections, showToolCalls: displaySettings.showToolCalls },
+        hooks: {
+          showContextInjections: displaySettings.showContextInjections,
+          showToolCalls: displaySettings.showToolCalls,
+          showThinking: displaySettings.showThinking,
+        },
         openDetails: (target) => {
           actions.select(target)
           layout.openDetails()

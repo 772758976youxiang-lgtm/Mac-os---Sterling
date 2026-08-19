@@ -10,6 +10,7 @@ describe('ConversationDisplaySettings', () => {
     const settings = new ConversationDisplaySettings(host.scope)
     expect(settings.showContextInjections.getSnapshot()).toBe(true)
     expect(settings.showToolCalls.getSnapshot()).toBe(true)
+    expect(settings.showThinking.getSnapshot()).toBe(true)
 
     settings.setShowContextInjections(false)
     expect(settings.showContextInjections.getSnapshot()).toBe(false)
@@ -18,16 +19,21 @@ describe('ConversationDisplaySettings', () => {
     settings.setShowToolCalls(false)
     expect(settings.showToolCalls.getSnapshot()).toBe(false)
     expect(host.set).toHaveBeenCalledWith('showToolCalls', false)
+
+    settings.setShowThinking(false)
+    expect(settings.showThinking.getSnapshot()).toBe(false)
+    expect(host.set).toHaveBeenCalledWith('showThinking', false)
   })
 
   it('adopts Host changes without writing them back', () => {
     const host = stubSettingsScope<ConversationSettings>()
     const settings = new ConversationDisplaySettings(host.scope)
     host.publish({
-      status: 'ready', value: { busyEnter: 'queue', showContextInjections: false, showToolCalls: false }, revision: 1, writable: true,
+      status: 'ready', value: { busyEnter: 'queue', showContextInjections: false, showToolCalls: false, showThinking: false }, revision: 1, writable: true,
     })
     expect(settings.showContextInjections.getSnapshot()).toBe(false)
     expect(settings.showToolCalls.getSnapshot()).toBe(false)
+    expect(settings.showThinking.getSnapshot()).toBe(false)
     expect(host.set).not.toHaveBeenCalled()
   })
 })

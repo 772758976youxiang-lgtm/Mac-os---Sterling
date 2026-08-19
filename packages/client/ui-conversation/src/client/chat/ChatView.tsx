@@ -162,7 +162,7 @@ function TurnStatus({ startTime, t }: {
  */
 export function ChatView({
   useSession, useSessions, useStore, renderSlot, sessionId, openFile, loadOlder, loadImage, inspectCall, chatScroll, forkAt,
-  fileMentions, useShowContextInjections, useShowToolCalls, t,
+  fileMentions, useShowContextInjections, useShowToolCalls, useShowThinking, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
@@ -178,6 +178,7 @@ export function ChatView({
   const selectedCallId = useStore(s => s.selection?.callId)
   const showContextInjections = useShowContextInjections(value => value)
   const showToolCalls = useShowToolCalls(value => value)
+  const showThinking = useShowThinking(value => value)
 
   const pendingSteering = useMemo(
     () => inbox.filter(item => item.placement === 'steering'),
@@ -404,6 +405,7 @@ export function ChatView({
               nodeKey={nodeKey}
               showContextInjections={showContextInjections}
               showToolCalls={showToolCalls}
+              showThinking={showThinking}
               useSession={useSession}
               selectedCallId={selectedCallId}
               cwd={cwd}

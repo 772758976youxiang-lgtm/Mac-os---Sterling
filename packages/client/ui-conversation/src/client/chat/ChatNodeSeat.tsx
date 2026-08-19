@@ -11,6 +11,7 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly nodeKey: string
   readonly showContextInjections: boolean
   readonly showToolCalls: boolean
+  readonly showThinking: boolean
   readonly useSession: ChatViewSlotProps['useSession']
   readonly renderSlot: ChatViewSlotProps['renderSlot']
   readonly t: ChatViewSlotProps['t']
@@ -54,7 +55,7 @@ function toolResultImages(node: ChatNode<'tool-call'>): ImageAttachmentRef[] {
 /** Subscribe and dispatch one stable Context key without observing sibling Nodes. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
   nodeKey, selectedCallId, cwd, openFile, inspectCall, forkAt,
-  loadImage, fileMentions, showContextInjections, showToolCalls, useSession, renderSlot, t,
+  loadImage, fileMentions, showContextInjections, showToolCalls, showThinking, useSession, renderSlot, t,
 }: ChatNodeSeatProps) {
   const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey))
   const routedNode = node as ChatNode | undefined
@@ -68,7 +69,8 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       forkAt,
       loadImage,
       fileMentions,
-    }, [node, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions])
+      showThinking,
+    }, [node, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions, showThinking])
   if (routedNode === undefined || owner === null) return null
   if (routedNode.kind === 'context' && !showContextInjections) return null
   if (routedNode.kind === 'tool-call' && !showToolCalls) {

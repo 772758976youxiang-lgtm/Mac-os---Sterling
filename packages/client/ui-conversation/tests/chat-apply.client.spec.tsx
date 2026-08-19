@@ -98,6 +98,7 @@ describe('apply wiring', () => {
       'composer-enter',
       'context-injection-visibility',
       'tool-call-visibility',
+      'thinking-visibility',
     ])
     await b.runtime.dispose()
   })

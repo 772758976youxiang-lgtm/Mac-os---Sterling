@@ -14,6 +14,9 @@ export const SHOW_CONTEXT_INJECTIONS_FIELD = 'showContextInjections'
 /** Field controlling whether tool-call records appear in the chat transcript. */
 export const SHOW_TOOL_CALLS_FIELD = 'showToolCalls'
 
+/** Field controlling whether assistant reasoning rows appear in the chat transcript. */
+export const SHOW_THINKING_FIELD = 'showThinking'
+
 /** Busy-Enter behaviors accepted at settings and input boundaries. */
 export const BUSY_ENTER_BEHAVIORS = ['queue', 'steer'] as const
 
@@ -29,6 +32,9 @@ export const DEFAULT_SHOW_CONTEXT_INJECTIONS = true
 /** Keep tool-call rows visible until the user opts into a cleaner view. */
 export const DEFAULT_SHOW_TOOL_CALLS = true
 
+/** Keep assistant reasoning rows visible until the user opts into a cleaner view. */
+export const DEFAULT_SHOW_THINKING = true
+
 /** Durable conversation section shared by the Host schema and the browser scope. */
 export interface ConversationSettings {
   /** Delivery mode for plain Enter while the addressed agent is busy. */
@@ -37,6 +43,8 @@ export interface ConversationSettings {
   showContextInjections: boolean
   /** Presentation-only preference for tool-call rows (MCP and friends). */
   showToolCalls: boolean
+  /** Presentation-only preference for assistant reasoning rows. */
+  showThinking: boolean
 }
 
 /** Durable conversation schema; also the wire envelope the browser scope validates against. */
@@ -44,4 +52,5 @@ export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [BUSY_ENTER_FIELD]: z.union([...BUSY_ENTER_BEHAVIORS]).default(DEFAULT_BUSY_ENTER_BEHAVIOR),
   [SHOW_CONTEXT_INJECTIONS_FIELD]: z.boolean().default(DEFAULT_SHOW_CONTEXT_INJECTIONS),
   [SHOW_TOOL_CALLS_FIELD]: z.boolean().default(DEFAULT_SHOW_TOOL_CALLS),
+  [SHOW_THINKING_FIELD]: z.boolean().default(DEFAULT_SHOW_THINKING),
 })

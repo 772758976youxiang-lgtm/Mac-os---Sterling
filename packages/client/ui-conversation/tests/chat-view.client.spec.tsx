@@ -167,6 +167,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   const chat = createChatStore().create()
   const showContextInjections = createSnapshotStore(true)
   const showToolCalls = createSnapshotStore(true)
+  const showThinking = createSnapshotStore(true)
   const t = makeTranslate(zh, commonZh)
   const toolOwners: Array<{
     callId: string
@@ -281,6 +282,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     useStore: bindSnapshotSelector(chat),
     useShowContextInjections: bindSnapshotSelector(showContextInjections),
     useShowToolCalls: bindSnapshotSelector(showToolCalls),
+    useShowThinking: bindSnapshotSelector(showThinking),
     actions: chat.actions,
     renderSlot,
     SessionProvider: SessionProviderStub,
@@ -299,7 +301,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
   const setSelection = (next: SelectionTarget | null): void => { chat.actions.select(next) }
   return {
     set, ChatView, props, openDetails, openFile, loadOlder, inspectCall,
-    chatScroll, forkAt, setSelection, showContextInjections, showToolCalls, toolOwners,
+    chatScroll, forkAt, setSelection, showContextInjections, showToolCalls, showThinking, toolOwners,
   }
 }
 
@@ -946,6 +948,28 @@ describe('ChatView', () => {
     expect(view.queryByTestId('tool-seat-r1')).toBeNull()
     expect(view.container.querySelector('[data-chat-flow-kind="tool-call"]')).not.toBeNull()
     expect(view.getByText('done')).toBeTruthy()
+  })
+
+  it('hides assistant reasoning rows while the show-thinking preference is off', () => {
+    const h = makeHarness({
+      nodes: [user(1, 'q'), {
+        kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1,
+        blocks: [{ kind: 'reasoning', text: 'careful thought' }, { kind: 'text', text: 'answer' }],
+      }],
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('思考')).toBeTruthy()
+    expect(view.getByText('careful thought')).toBeTruthy()
+    expect(view.getByText('answer')).toBeTruthy()
+
+    act(() => { h.showThinking.set(false) })
+    // The reasoning disclosure disappears without taking the answer with it.
+    expect(view.queryByText('思考')).toBeNull()
+    expect(view.queryByText('careful thought')).toBeNull()
+    expect(view.getByText('answer')).toBeTruthy()
+
+    act(() => { h.showThinking.set(true) })
+    expect(view.getByText('careful thought')).toBeTruthy()
   })
 
   it('keeps the Tool renderer mounted when a running call settles into log order', () => {
