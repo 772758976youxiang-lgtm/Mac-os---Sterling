@@ -1,0 +1,19 @@
+# dsh-file-tree bundle patch: registers the right-side file tree plugin.
+#
+# A single loader row: `name: dsh-file-tree` resolves the package main
+# (dist/index.js), whose default export is the FileTreeGateway
+# (TypertRemoteService) class — the host half. The browser half is discovered
+# automatically: dsh-client-modules scans loader entries whose package
+# declares `dsh.client` + `exports["./client"]`, so dist/client.js is served
+# at /plugins/dsh-file-tree/client.js and seeded into window.__DSH_BOOT__.
+#
+# `root` is only the FALLBACK root before a session pins one: when the file
+# tree opens, the browser resolves the current conversation's workspace
+# directory (SessionSummary.cwd) and re-pins the gateway root via the
+# `setRoot` RPC. Paths outside the currently pinned root are rejected by the
+# host.
+- insert:
+    - id: dsh-file-tree
+      name: 'dsh-file-tree'
+      config:
+        root: !!js process.cwd()
