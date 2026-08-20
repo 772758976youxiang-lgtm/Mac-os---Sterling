@@ -26,10 +26,14 @@ it('ships install metadata with the built web application', async () => {
   })
 })
 
-it('ships the Sterling app icon and favicon alias', async () => {
+it('ships the Sterling app icon and the inline brand favicon', async () => {
   const icon = await readFile(join(DIST_ROOT, 'sterling-icon.png'))
   expect(icon.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
 
+  // The favicon is the brand mark inlined as vector art, not an alias to the PNG.
   const favicon = await readFile(join(DIST_ROOT, 'favicon.svg'), 'utf8')
-  expect(favicon).toContain('sterling-icon.png')
+  expect(favicon).toContain('<svg')
+  expect(favicon).toContain('viewBox="0 0 512 512"')
+  expect(favicon).toContain('#FFFFFF')
+  expect(favicon).not.toContain('sterling-icon.png')
 })
