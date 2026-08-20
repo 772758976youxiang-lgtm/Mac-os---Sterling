@@ -79,6 +79,7 @@
     "@deepseek-ai/dsh-workflow-worker-thread": "workspace:^",
     "@deepseek-ai/dsh-agent-instructions": "workspace:^",
     "commander": "^15.0.0",
+    "dsh-bottom-info-bar": "workspace:*",
     "@deepseek-ai/cordis": "workspace:^",
     "js-yaml": "^4.2.0",
     "node-addon-require-builtin": "^0.1.4"

@@ -53,15 +53,3 @@ pre-push:
   jobs:
     - name: typecheck
       run: pnpm run typecheck
-
-# 拉取合并 / 切换分支后自动同步安装 dsh-bottom-info-bar 插件（幂等，见
-# scripts/install-bottom-info-bar.mjs）；失败不阻断 git 操作。
-post-merge:
-  jobs:
-    - name: bottom-info-bar auto-install
-      run: bash scripts/auto-install-bottom-info-bar.sh
-
-post-checkout:
-  jobs:
-    - name: bottom-info-bar auto-install
-      run: bash scripts/auto-install-bottom-info-bar.sh
