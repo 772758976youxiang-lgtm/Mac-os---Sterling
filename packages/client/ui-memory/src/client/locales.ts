@@ -1,0 +1,51 @@
+/** Copy dictionaries for the memory-system settings section. */
+
+export const en = {
+  nav: 'Memory', title: 'Memory', intro: 'Manage memories, skills, session recall, the learning loop, and providers.',
+  vault: 'Vault', skills: 'Skills', search: 'Search', loop: 'Loop', providers: 'Providers',
+  vaultTag: 'MEMORY.md', skillsTag: 'SKILL.md', searchTag: 'FTS5', loopTag: 'review', providersTag: 'providers',
+  vaultDesc: 'Memories are stored as MEMORY.md (pure Markdown, ## sections) plus USER.md, curated by the agent across sessions.',
+  skillsDesc: 'Skills are procedural memory ("how to do"). Each lives in a SKILL.md with YAML frontmatter, created by skill_manage and improved through usage.',
+  searchDesc: 'Sessions are stored in SQLite state.db and searched across sessions through FTS5 with trigram / CJK tokenizer strategies.',
+  loopDesc: 'Memory writes are event-driven: after each turn, background_review forks an agent to decide what to write to MEMORY.md or which skill to create, gated by write_approval.',
+  providersDesc: 'Memory backends are pluggable: the built-in BuiltinMemoryProvider wraps MEMORY.md, and external providers (e.g. Honcho) are discovered via plugins/memory.',
+  count: 'count', newMemory: 'New memory', searchMemory: 'Search memories…', selectHint: 'Choose a memory in the vault',
+  edit: 'Edit', delete: 'Delete', confirmDelete: 'Delete?', cancel: 'Cancel', save: 'Save changes', create: 'Create memory',
+  type: 'Type', importance: 'Importance', tags: 'Tags', updated: 'Updated', expires: 'Expires', category: 'Category',
+  name: 'Name', description: 'Description', high: 'High', medium: 'Medium', low: 'Low', longTerm: 'Long-term', shortTerm: 'Short-term',
+  emptyVault: 'Choose a memory on the right, or create one.', loading: 'Loading…',
+  created: 'Memory created', saved: 'Memory saved', deleted: 'Memory deleted',
+  skillCount: 'skills', skillName: 'name', skillVersion: 'version', skillDescription: 'description', skillTools: 'allowed-tools',
+  active: 'Active', pinned: 'Pinned', staged: 'Staged', retired: 'Retired',
+  searchPlaceholder: 'Search past sessions…', searchEmpty: 'Type keywords to search sessions.',
+  flowTurn: 'Turn end', flowReview: 'background_review', flowWrite: 'Write MEMORY.md', flowSkill: 'Create skill', flowApproval: 'write_approval', flowCurator: 'curator',
+  loopNote: 'Fast loop sinks experience within a session; slow loop consolidates across sessions.',
+  providerStorage: 'Storage', providerApi: 'Interface', providerDesc: 'Description',
+  loadError: 'Could not load data.', retry: 'Retry',
+} as const
+
+export type MemoryKey = keyof typeof en
+
+export const zh: Record<MemoryKey, string> = {
+  nav: '记忆系统', title: '记忆系统', intro: '管理记忆库、技能库、会话检索、学习循环与记忆提供者。',
+  vault: '记忆库', skills: '技能库', search: '会话检索', loop: '学习循环', providers: '记忆提供者',
+  vaultTag: 'MEMORY.md', skillsTag: 'SKILL.md', searchTag: 'FTS5', loopTag: 'review', providersTag: 'providers',
+  vaultDesc: '记忆按 MEMORY.md（纯 Markdown，## 分区）+ USER.md 存储，由代理在会话中主动策展维护。',
+  skillsDesc: '技能 = 程序性记忆（「怎么做」），存储为 SKILL.md（强制 YAML frontmatter），由 skill_manage 自主创建，随使用情况自我提升。',
+  searchDesc: '会话存入 SQLite state.db，通过 FTS5 虚拟表做跨会话全文检索，含 trigram / CJK 多策略分词。',
+  loopDesc: '记忆写入是事件驱动：每轮回合结束后 background_review fork 子代理评估，决定写入 MEMORY.md 或创建技能，并经 write_approval 门控。',
+  providersDesc: '记忆后端可插拔：内置 BuiltinMemoryProvider（包装 MEMORY.md），外部 provider（如 Honcho）经 plugins/memory 发现。',
+  count: '条', newMemory: '＋ 新建记忆', searchMemory: '搜索记忆…', selectHint: '在右侧记忆库中选择一条记忆查看详情',
+  edit: '编辑', delete: '删除', confirmDelete: '确认删除？', cancel: '取消', save: '保存修改', create: '创建记忆',
+  type: '类型', importance: '重要程度', tags: '标签', updated: '更新', expires: '过期', category: '分类',
+  name: '名称', description: '描述', high: '高', medium: '中', low: '低', longTerm: '长期记忆', shortTerm: '短期记忆',
+  emptyVault: '在右侧记忆库中选择一条记忆查看详情', loading: '加载中…',
+  created: '已创建记忆', saved: '已保存记忆', deleted: '已删除记忆',
+  skillCount: '个技能', skillName: 'name', skillVersion: 'version', skillDescription: 'description', skillTools: 'allowed-tools',
+  active: '生效', pinned: '固定', staged: '暂存', retired: '归档',
+  searchPlaceholder: '搜索历史会话…', searchEmpty: '输入关键词，跨会话检索历史对话',
+  flowTurn: '回合结束', flowReview: 'background_review', flowWrite: '写入 MEMORY.md', flowSkill: '创建技能', flowApproval: 'write_approval', flowCurator: 'curator',
+  loopNote: '「快循环」在单次会话内即时沉淀经验；「慢循环」跨会话周期固化。',
+  providerStorage: '存储', providerApi: '接口', providerDesc: '说明',
+  loadError: '数据加载失败。', retry: '重试',
+}
