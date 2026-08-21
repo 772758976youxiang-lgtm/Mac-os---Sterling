@@ -1,0 +1,6 @@
+# dsh-memvault bundle patch: mounts the memvault Host half into a profile layer stack.
+# The plugin row id is 'dsh-memvault'; users may override its behavior in their
+# profile's cordis.patch.yml with a row carrying the same id.
+- insert:
+    - id: dsh-memvault
+      name: 'dsh-memvault'
